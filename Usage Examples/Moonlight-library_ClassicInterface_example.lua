@@ -1,91 +1,188 @@
 --[[
     MoonLib ClassicInterface example
 
-    Place MoonLib_ClassicInterface as a ModuleScript next to this LocalScript,
-    then run this LocalScript from StarterPlayerScripts or StarterGui.
-
-    The toggle changes the local player's movement values while enabled
-    and restores the original values when disabled.
+    An Example code of how to use this Classic Interface Library
 ]]
 
 local Players = game:GetService("Players")
 
 local Player = Players.LocalPlayer
-local MoonLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/MoonOFCC/RobloxGUI_Moonlight_Libraries/refs/heads/main/Moonlight Classic Library/Moonlight-library_ClassicInterface.lua"))()
+
+local MoonLib = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/MoonOFCC/RobloxGUI_Moonlight_Libraries/refs/heads/main/Moonlight%20Classic%20Library/Moonlight-Library_ClassicInterface_V2.lua"
+))()
 
 local Window = MoonLib:CreateWindow(
-    "Player Controls",
-    "rbxassetid://0" -- Replace with your own window image asset ID.
+    "Player Controls"
 )
+
+local Theme = Window.Theme
 
 local PlayerTab = Window:CreateTab(
     "Player",
-    "rbxassetid://0", -- Replace with your own tab image asset ID.
+    nil,
     1
 )
 
-local ENABLED_SPEED = 32
+local ENABLED_WALK_SPEED = 32
 local ENABLED_JUMP_POWER = 75
 
-local savedWalkSpeed
-local savedJumpPower
-local savedUseJumpPower
-local activeHumanoid
 local movementEnabled = false
-local movementToggle
+local selectedSpeed = ENABLED_WALK_SPEED
+
+local savedValues = {}
+local activeHumanoid
 
 local function getHumanoid()
-    local character = Player.Character or Player.CharacterAdded:Wait()
+    local character = Player.Character
+        or Player.CharacterAdded:Wait()
+
     return character:FindFirstChildOfClass("Humanoid")
         or character:WaitForChild("Humanoid")
 end
 
-local function saveDefaults(humanoid)
-    activeHumanoid = humanoid
-    savedWalkSpeed = humanoid.WalkSpeed
-    savedUseJumpPower = humanoid.UseJumpPower
-    savedJumpPower = humanoid.JumpPower
+local function saveOriginalValues(humanoid)
+    if savedValues[humanoid] then
+        return
+    end
+
+    savedValues[humanoid] = {
+        WalkSpeed = humanoid.WalkSpeed,
+        JumpPower = humanoid.JumpPower,
+        UseJumpPower = humanoid.UseJumpPower,
+    }
 end
 
 local function applyMovement(enabled)
     local humanoid = getHumanoid()
 
-    if humanoid ~= activeHumanoid or savedWalkSpeed == nil then
-        saveDefaults(humanoid)
+    if humanoid ~= activeHumanoid then
+        activeHumanoid = humanoid
+        saveOriginalValues(humanoid)
     end
 
     movementEnabled = enabled == true
 
-    if enabled then
-        humanoid.WalkSpeed = ENABLED_SPEED
+    if movementEnabled then
+        humanoid.WalkSpeed = selectedSpeed
         humanoid.UseJumpPower = true
         humanoid.JumpPower = ENABLED_JUMP_POWER
     else
-        humanoid.WalkSpeed = savedWalkSpeed
-        humanoid.UseJumpPower = savedUseJumpPower
-        humanoid.JumpPower = savedJumpPower
+        local original = savedValues[humanoid]
+
+        if original then
+            humanoid.WalkSpeed = original.WalkSpeed
+            humanoid.JumpPower = original.JumpPower
+            humanoid.UseJumpPower = original.UseJumpPower
+        end
     end
 end
 
-Player.CharacterAdded:Connect(function(character)
-    activeHumanoid = character:WaitForChild("Humanoid")
+PlayerTab:CreateHeader(
+    "Player Settings",
+    "Adjust your movement options",
+    1
+)
 
-    -- If the toggle is enabled when the player respawns, reapply the values.
-    if movementEnabled then
-        applyMovement(true)
-    end
-end)
+PlayerTab:CreateInfoCard(
+    "Movement",
+    "Customize your character's movement values.",
+    Theme.Blue,
+    2
+)
 
-movementToggle = PlayerTab:CreateToggle(
+local MovementToggle = PlayerTab:CreateToggle(
     "Speed + Jump Boost",
     false,
     function(enabled)
         applyMovement(enabled)
     end,
-    1
+    3
+)
+
+local SpeedSlider = PlayerTab:CreateSlider(
+    "WalkSpeed",
+    false,
+    function(_, value)
+        selectedSpeed = value
+
+        if movementEnabled then
+            local humanoid = getHumanoid()
+            humanoid.WalkSpeed = selectedSpeed
+            humanoid.JumpPower = ENABLED_JUMP_POWER
+            humanoid.UseJumpPower = true
+        end
+    end,
+    ENABLED_WALK_SPEED,
+    16,
+    100,
+    4
 )
 
 PlayerTab:CreateLabel(
-    "Speed: " .. tostring(ENABLED_SPEED) .. "  |  JumpPower: " .. tostring(ENABLED_JUMP_POWER),
-    2
+    "JumpPower: " .. tostring(ENABLED_JUMP_POWER),
+    5
 )
+
+PlayerTab:CreateButton(
+    "Reset Movement",
+    function()
+        movementEnabled = false
+
+        if MovementToggle then
+            MovementToggle:SetValue(false)
+        end
+
+        local humanoid = getHumanoid()
+        local original = savedValues[humanoid]
+
+        if original then
+            humanoid.WalkSpeed = original.WalkSpeed
+            humanoid.JumpPower = original.JumpPower
+            humanoid.UseJumpPower = original.UseJumpPower
+        end
+    end,
+    Theme.Red,
+    6
+)
+
+PlayerTab:CreateDropdown(
+    "Movement Mode",
+    {
+        [1] = "Normal",
+        [2] = "Fast",
+        [3] = "Extreme",
+    },
+    function(name)
+        if name == "Normal" then
+            selectedSpeed = 16
+        elseif name == "Fast" then
+            selectedSpeed = 32
+        elseif name == "Extreme" then
+            selectedSpeed = 100
+        end
+
+        if SpeedSlider then
+            SpeedSlider:SetValue(selectedSpeed)
+        end
+
+        if movementEnabled then
+            applyMovement(true)
+        end
+    end,
+    7
+)
+
+Player.CharacterAdded:Connect(function(character)
+    local humanoid = character:WaitForChild("Humanoid")
+
+    activeHumanoid = humanoid
+    saveOriginalValues(humanoid)
+
+    if movementEnabled then
+        task.wait(0.25)
+        applyMovement(true)
+    end
+end)
+
+print("[MoonLib] Player controls loaded successfully")
