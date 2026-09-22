@@ -272,6 +272,8 @@ function MoonLib:CreateWindow(title, windowImage)
     local visible = true
     local currentTab = nil
 
+    local stateKeybind = Enum.KeyCode.RightShift
+
     local connections = {}
     local tabs = {}
 
@@ -478,7 +480,7 @@ function MoonLib:CreateWindow(title, windowImage)
                 return
             end
 
-            if input.KeyCode == Enum.KeyCode.RightShift then
+            if input.KeyCode == stateKeybind then
                 toggleWindow()
             end
         end)
@@ -1963,6 +1965,26 @@ function MoonLib:CreateWindow(title, windowImage)
         )
     end
 
+    function Window:SetStateKeybind(keyCode)
+        if typeof(keyCode) ~= "EnumItem"
+            or keyCode.EnumType ~= Enum.KeyCode then
+    
+            warn(
+                "MoonLib SetStateKeybind expects an Enum.KeyCode value."
+            )
+    
+            return false
+        end
+    
+        stateKeybind = keyCode
+    
+        return true
+    end
+    
+    function Window:GetStateKeybind()
+        return stateKeybind
+    end
+    
     function Window:SelectTab(tabName)
         for _, record in ipairs(tabs) do
             if record.Name == tostring(tabName) then
