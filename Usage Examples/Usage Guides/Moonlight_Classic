@@ -1,0 +1,988 @@
+MoonLib - Simple Usage Guide
+============================
+
+This guide is based on the current ClassicInterface version of MoonLib.
+
+The library is loaded using an executor with loadstring:
+
+local MoonLib = loadstring(game:HttpGet(
+    "YOUR_RAW_LIBRARY_URL"
+))()
+
+The value returned by loadstring is the MoonLib library object.
+
+--------------------------------------------------
+-- CREATE A WINDOW
+--------------------------------------------------
+
+local Window = MoonLib:CreateWindow(
+    "Player Controls"
+)
+
+CreateWindow parameters:
+
+MoonLib:CreateWindow(
+    WindowTitle,
+    WindowImage
+)
+
+WindowTitle:
+    The text displayed at the top of the GUI.
+
+WindowImage:
+    Optional image displayed next to the window title.
+
+    It can be:
+
+    "rbxassetid://123456789"
+    123456789
+    "https://your-image-url"
+
+Example:
+
+local Window = MoonLib:CreateWindow(
+    "My GUI",
+    "rbxassetid://123456789"
+)
+
+The returned Window object is used to create tabs and control the GUI.
+
+--------------------------------------------------
+-- CREATE A TAB
+--------------------------------------------------
+
+local PlayerTab = Window:CreateTab(
+    "Player",
+    nil,
+    1
+)
+
+CreateTab parameters:
+
+Window:CreateTab(
+    TabName,
+    TabImage,
+    IndexPosition
+)
+
+TabName:
+    The name shown inside the sidebar.
+
+TabImage:
+    Optional image shown beside the tab name.
+
+    It can be:
+
+    "rbxassetid://123456789"
+    123456789
+    "https://your-image-url"
+
+    If no image is provided, the library shows the first letter
+    of the tab name instead.
+
+IndexPosition:
+    Controls the order of the tabs in the sidebar.
+
+Example:
+
+local PlayerTab = Window:CreateTab(
+    "Player",
+    "rbxassetid://123456789",
+    1
+)
+
+local SettingsTab = Window:CreateTab(
+    "Settings",
+    "rbxassetid://987654321",
+    2
+)
+
+The first created tab is automatically selected.
+
+--------------------------------------------------
+-- CREATE A LABEL
+--------------------------------------------------
+
+PlayerTab:CreateLabel(
+    "This is a normal label.",
+    1
+)
+
+CreateLabel parameters:
+
+Tab:CreateLabel(
+    Text,
+    IndexPosition,
+    TextColor
+)
+
+Text:
+    The text displayed by the label.
+
+IndexPosition:
+    Controls the position of the label inside the tab.
+
+TextColor:
+    Optional Color3 value for the text.
+
+Example:
+
+PlayerTab:CreateLabel(
+    "Player Settings",
+    1,
+    Color3.fromRGB(255, 255, 255)
+)
+
+The label returns the TextLabel instance.
+
+--------------------------------------------------
+-- CREATE A SECTION HEADER
+--------------------------------------------------
+
+PlayerTab:CreateHeader(
+    "Player Settings",
+    "Change your player options below.",
+    1
+)
+
+CreateHeader parameters:
+
+Tab:CreateHeader(
+    HeaderTitle,
+    HeaderSubtitle,
+    IndexPosition
+)
+
+HeaderTitle:
+    Large text displayed as the section title.
+
+HeaderSubtitle:
+    Smaller text displayed underneath the title.
+
+IndexPosition:
+    Controls the position inside the tab.
+
+Example:
+
+PlayerTab:CreateHeader(
+    "Movement",
+    "Customize your movement settings.",
+    1
+)
+
+This is useful for separating different parts of a tab.
+
+--------------------------------------------------
+-- CREATE AN INFORMATION CARD
+--------------------------------------------------
+
+PlayerTab:CreateInfoCard(
+    "Movement",
+    "Customize your character movement values.",
+    Window.Theme.Blue,
+    2
+)
+
+CreateInfoCard parameters:
+
+Tab:CreateInfoCard(
+    CardTitle,
+    CardDescription,
+    AccentColor,
+    IndexPosition
+)
+
+CardTitle:
+    The title displayed on the card.
+
+CardDescription:
+    The description displayed below the title.
+
+AccentColor:
+    The color used for the card outline and side accent.
+
+IndexPosition:
+    Controls the position inside the tab.
+
+Example:
+
+PlayerTab:CreateInfoCard(
+    "Warning",
+    "Some games may reset movement values.",
+    Window.Theme.Red,
+    3
+)
+
+Available default theme colors include:
+
+Window.Theme.Blue
+Window.Theme.BlueLight
+Window.Theme.BlueDark
+Window.Theme.Green
+Window.Theme.Red
+Window.Theme.Yellow
+Window.Theme.Purple
+Window.Theme.Text
+Window.Theme.SecondaryText
+Window.Theme.MutedText
+Window.Theme.Panel
+Window.Theme.Card
+Window.Theme.BrightBorder
+Window.Theme.Border
+
+Use Window.Theme instead of MoonLib.Theme.
+
+--------------------------------------------------
+-- CREATE A STAT CARD
+--------------------------------------------------
+
+PlayerTab:CreateStatCard(
+    "Current Speed",
+    "32",
+    Window.Theme.Blue,
+    4
+)
+
+CreateStatCard parameters:
+
+Tab:CreateStatCard(
+    StatTitle,
+    StatValue,
+    AccentColor,
+    IndexPosition
+)
+
+StatTitle:
+    The smaller title shown above the value.
+
+StatValue:
+    The large value shown on the card.
+
+AccentColor:
+    The color used for the value and outline.
+
+IndexPosition:
+    Controls the position inside the tab.
+
+Example:
+
+PlayerTab:CreateStatCard(
+    "JumpPower",
+    "75",
+    Window.Theme.Green,
+    5
+)
+
+--------------------------------------------------
+-- CREATE A BUTTON
+--------------------------------------------------
+
+PlayerTab:CreateButton(
+    "Reset Settings",
+    function()
+        print("The reset button was clicked.")
+    end,
+    Window.Theme.Red,
+    6
+)
+
+CreateButton parameters:
+
+Tab:CreateButton(
+    ButtonText,
+    CallbackFunction,
+    CustomColor,
+    IndexPosition
+)
+
+ButtonText:
+    The text displayed on the button.
+
+CallbackFunction:
+    The function that runs when the button is clicked.
+
+CustomColor:
+    Optional Color3 value for the button background and outline.
+
+IndexPosition:
+    Controls the position inside the tab.
+
+Example:
+
+PlayerTab:CreateButton(
+    "Print Message",
+    function()
+        print("Hello from MoonLib.")
+    end,
+    nil,
+    7
+)
+
+A button returns the TextButton instance.
+
+--------------------------------------------------
+-- CREATE A TOGGLE
+--------------------------------------------------
+
+local SpeedToggle = PlayerTab:CreateToggle(
+    "Speed + Jump Boost",
+    false,
+    function(enabled)
+        print("Toggle state:", enabled)
+    end,
+    8
+)
+
+CreateToggle parameters:
+
+Tab:CreateToggle(
+    ToggleText,
+    DefaultState,
+    CallbackFunction,
+    IndexPosition,
+    CustomColor
+)
+
+ToggleText:
+    The text shown beside the switch.
+
+DefaultState:
+    true means the toggle starts enabled.
+
+    false means the toggle starts disabled.
+
+CallbackFunction:
+    Runs whenever the toggle changes.
+
+    The callback receives one value:
+
+    enabled
+
+    enabled is either true or false.
+
+IndexPosition:
+    Controls the position inside the tab.
+
+CustomColor:
+    Optional Color3 value for the toggle container.
+
+Example:
+
+local FlyToggle = PlayerTab:CreateToggle(
+    "Enable Feature",
+    false,
+    function(enabled)
+        if enabled then
+            print("Feature enabled.")
+        else
+            print("Feature disabled.")
+        end
+    end,
+    9
+)
+
+Toggle methods:
+
+SpeedToggle:GetValue()
+
+    Returns true or false depending on the current state.
+
+Example:
+
+if SpeedToggle:GetValue() then
+    print("The toggle is currently enabled.")
+end
+
+SpeedToggle:SetValue(
+    true,
+    true
+)
+
+The first argument is the new state.
+
+The second argument controls whether the callback should run.
+
+Example:
+
+SpeedToggle:SetValue(true, false)
+
+This enables the toggle without running its callback.
+
+SpeedToggle:Toggle()
+
+Switches the toggle to the opposite state.
+
+Example:
+
+SpeedToggle:Toggle()
+
+SpeedToggle:Destroy()
+
+Removes the toggle from the GUI.
+
+--------------------------------------------------
+-- CREATE A SLIDER
+--------------------------------------------------
+
+local SpeedSlider = PlayerTab:CreateSlider(
+    "WalkSpeed",
+    false,
+    function(enabled, value)
+        print("Slider enabled:", enabled)
+        print("Slider value:", value)
+    end,
+    32,
+    16,
+    100,
+    10
+)
+
+CreateSlider parameters:
+
+Tab:CreateSlider(
+    SliderText,
+    DefaultState,
+    CallbackFunction,
+    DefaultValue,
+    MinimumValue,
+    MaximumValue,
+    IndexPosition,
+    CustomColor
+)
+
+SliderText:
+    The text shown above the slider.
+
+DefaultState:
+    The initial enabled state associated with the slider.
+
+DefaultValue:
+    The starting value of the slider.
+
+MinimumValue:
+    The lowest value the slider can use.
+
+MaximumValue:
+    The highest value the slider can use.
+
+IndexPosition:
+    Controls the position inside the tab.
+
+CustomColor:
+    Optional Color3 value for the slider container.
+
+The slider callback receives two values:
+
+enabled
+value
+
+Example:
+
+local PowerSlider = PlayerTab:CreateSlider(
+    "Power",
+    true,
+    function(enabled, value)
+        if enabled then
+            print("Power is active:", value)
+        end
+    end,
+    50,
+    0,
+    100,
+    11,
+    Window.Theme.Blue
+)
+
+Slider methods:
+
+PowerSlider:GetValue()
+
+    Returns the current slider value.
+
+PowerSlider:IsEnabled()
+
+    Returns true or false depending on the slider state.
+
+PowerSlider:SetValue(
+    75,
+    true
+)
+
+Sets the slider value to 75.
+
+The second argument controls whether the callback runs.
+
+PowerSlider:SetEnabled(
+    true,
+    true
+)
+
+Changes the enabled state of the slider.
+
+The second argument controls whether the callback runs.
+
+PowerSlider:Destroy()
+
+Removes the slider from the GUI.
+
+--------------------------------------------------
+-- CREATE A DROPDOWN
+--------------------------------------------------
+
+local ModeDropdown = PlayerTab:CreateDropdown(
+    "Movement Mode",
+    {
+        [1] = "Normal",
+        [2] = "Fast",
+        [3] = "Extreme",
+    },
+    function(name, id)
+        print("Selected name:", name)
+        print("Selected ID:", id)
+    end,
+    12
+)
+
+CreateDropdown parameters:
+
+Tab:CreateDropdown(
+    DropdownText,
+    OptionsTable,
+    CallbackFunction,
+    IndexPosition,
+    CustomColor,
+    MultiSelect
+)
+
+DropdownText:
+    The title displayed on the dropdown.
+
+OptionsTable:
+    A table containing the selectable options.
+
+CallbackFunction:
+    Runs when the user selects an option.
+
+    In single-select mode, the callback receives:
+
+    SelectedName
+    SelectedID
+
+IndexPosition:
+    Controls the position inside the tab.
+
+CustomColor:
+    Optional Color3 value for the dropdown header.
+
+MultiSelect:
+    Optional multi-selection mode.
+
+    Use:
+
+    true
+
+    or:
+
+    "Multi"
+
+Example of a single-select dropdown:
+
+local ModeDropdown = PlayerTab:CreateDropdown(
+    "Movement Mode",
+    {
+        [1] = "Normal",
+        [2] = "Fast",
+        [3] = "Extreme",
+    },
+    function(name, id)
+        if name == "Normal" then
+            print("Normal mode selected.")
+        elseif name == "Fast" then
+            print("Fast mode selected.")
+        elseif name == "Extreme" then
+            print("Extreme mode selected.")
+        end
+    end,
+    13
+)
+
+The table keys become the IDs.
+
+The table values become the displayed names.
+
+Example:
+
+{
+    [1] = "Normal",
+    [2] = "Fast",
+    [3] = "Extreme",
+}
+
+The names are:
+
+Normal
+Fast
+Extreme
+
+The IDs are:
+
+1
+2
+3
+
+Dropdown methods:
+
+ModeDropdown:GetValue()
+
+    Returns the selected name.
+
+ModeDropdown:GetIds()
+
+    Returns the selected ID.
+
+ModeDropdown:GetSelection()
+
+    Returns both selected names and selected IDs.
+
+Example:
+
+local names, ids = ModeDropdown:GetSelection()
+
+print(names[1])
+print(ids[1])
+
+ModeDropdown:GetMode()
+
+    Returns:
+
+    "Single"
+
+    or:
+
+    "Multi"
+
+ModeDropdown:SetOpen(
+    true
+)
+
+Opens the dropdown.
+
+ModeDropdown:SetOpen(
+    false
+)
+
+Closes the dropdown.
+
+ModeDropdown:SetValue(
+    "Fast",
+    true
+)
+
+Selects the option named "Fast".
+
+The second argument controls whether the callback runs.
+
+You can also select by ID:
+
+ModeDropdown:SetValue(
+    2,
+    true
+)
+
+ModeDropdown:Clear(
+    true
+)
+
+Clears the selected option.
+
+The argument controls whether the callback runs.
+
+ModeDropdown:Destroy()
+
+Removes the dropdown from the GUI.
+
+--------------------------------------------------
+-- MULTI-SELECT DROPDOWN
+--------------------------------------------------
+
+local FeaturesDropdown = PlayerTab:CreateDropdown(
+    "Features",
+    {
+        [1] = "Speed",
+        [2] = "Jump",
+        [3] = "Gravity",
+    },
+    function(names, ids)
+        print("Selected names:")
+
+        for _, name in ipairs(names) do
+            print(name)
+        end
+
+        print("Selected IDs:")
+
+        for _, id in ipairs(ids) do
+            print(id)
+        end
+    end,
+    14,
+    nil,
+    true
+)
+
+The last argument true enables multi-select mode.
+
+You may also use:
+
+"Multi"
+
+instead of true.
+
+In multi-select mode, the callback receives:
+
+SelectedNames
+SelectedIDs
+
+Example:
+
+local names, ids = FeaturesDropdown:GetSelection()
+
+FeaturesDropdown:SetValue(
+    {
+        "Speed",
+        "Jump",
+    },
+    true
+)
+
+You can also select using IDs:
+
+FeaturesDropdown:SetValue(
+    {
+        1,
+        2,
+    },
+    true
+)
+
+--------------------------------------------------
+-- WINDOW METHODS
+--------------------------------------------------
+
+Window:SetTitle(
+    "New Window Title"
+)
+
+Changes the title displayed at the top of the GUI.
+
+Example:
+
+Window:SetTitle("Updated Player Controls")
+
+Window:SetImage(
+    "rbxassetid://123456789"
+)
+
+Changes the image next to the window title.
+
+Window:SelectTab(
+    "Player"
+)
+
+Selects a tab by its name.
+
+Example:
+
+local successful = Window:SelectTab("Settings")
+
+if successful then
+    print("Settings tab selected.")
+end
+
+Window:Toggle()
+
+Hides the GUI if it is visible.
+
+Shows the GUI if it is hidden.
+
+Window:IsVisible()
+
+Returns true or false depending on whether the window is visible.
+
+Example:
+
+if Window:IsVisible() then
+    print("The GUI is visible.")
+end
+
+Window:Destroy()
+
+Completely removes the GUI and disconnects its library connections.
+
+Example:
+
+Window:Destroy()
+
+--------------------------------------------------
+-- RIGHTSHIFT TOGGLE
+--------------------------------------------------
+
+The library automatically listens for the RightShift key.
+
+Pressing RightShift:
+
+    If the GUI is visible, it becomes hidden.
+
+    If the GUI is hidden, it becomes visible.
+
+This feature does not require additional code.
+
+--------------------------------------------------
+-- CUSTOM COLORS
+--------------------------------------------------
+
+Custom colors must be Color3 values.
+
+Correct:
+
+Window.Theme.Blue
+
+Color3.fromRGB(255, 0, 0)
+
+Color3.new(1, 0, 0)
+
+Example:
+
+PlayerTab:CreateButton(
+    "Red Button",
+    function()
+        print("Clicked.")
+    end,
+    Color3.fromRGB(200, 40, 50),
+    1
+)
+
+Do not pass a color as a normal text string.
+
+Incorrect:
+
+"Red"
+
+Correct:
+
+Color3.fromRGB(255, 0, 0)
+
+--------------------------------------------------
+-- INDEX POSITIONS
+--------------------------------------------------
+
+The IndexPosition controls the order of objects inside a tab.
+
+Example:
+
+PlayerTab:CreateLabel("First", 1)
+
+PlayerTab:CreateButton(
+    "Second",
+    function()
+        print("Second")
+    end,
+    nil,
+    2
+)
+
+PlayerTab:CreateToggle(
+    "Third",
+    false,
+    function(enabled)
+        print(enabled)
+    end,
+    3
+)
+
+Lower numbers appear first.
+
+If two objects use the same index, their order may depend on when they were created.
+
+--------------------------------------------------
+-- COMPLETE EXAMPLE
+--------------------------------------------------
+
+local Players = game:GetService("Players")
+
+local Player = Players.LocalPlayer
+
+local MoonLib = loadstring(game:HttpGet(
+    "YOUR_RAW_LIBRARY_URL"
+))()
+
+local Window = MoonLib:CreateWindow(
+    "Player Controls",
+    "rbxassetid://123456789"
+)
+
+local PlayerTab = Window:CreateTab(
+    "Player",
+    "rbxassetid://987654321",
+    1
+)
+
+PlayerTab:CreateHeader(
+    "Player Settings",
+    "Adjust your movement options.",
+    1
+)
+
+PlayerTab:CreateInfoCard(
+    "Movement",
+    "Customize your character's movement values.",
+    Window.Theme.Blue,
+    2
+)
+
+local SpeedToggle = PlayerTab:CreateToggle(
+    "Speed + Jump Boost",
+    false,
+    function(enabled)
+        print("Speed and jump boost:", enabled)
+    end,
+    3
+)
+
+local SpeedSlider = PlayerTab:CreateSlider(
+    "WalkSpeed",
+    false,
+    function(enabled, value)
+        print("Slider enabled:", enabled)
+        print("WalkSpeed value:", value)
+    end,
+    32,
+    16,
+    100,
+    4
+)
+
+PlayerTab:CreateButton(
+    "Reset Settings",
+    function()
+        SpeedToggle:SetValue(false, true)
+        SpeedSlider:SetValue(16, true)
+    end,
+    Window.Theme.Red,
+    5
+)
+
+local ModeDropdown = PlayerTab:CreateDropdown(
+    "Movement Mode",
+    {
+        [1] = "Normal",
+        [2] = "Fast",
+        [3] = "Extreme",
+    },
+    function(name, id)
+        print("Selected movement mode:", name, id)
+    end,
+    6
+)
+
+print("MoonLib loaded successfully.")
