@@ -46,6 +46,85 @@ local Window = MoonLib:CreateWindow(
 The returned Window object is used to create tabs and control the GUI.
 
 --------------------------------------------------
+-- CHANGE THE WINDOW STATE KEYBIND
+--------------------------------------------------
+
+The GUI uses RightShift as the default keybind to show or hide
+the window.
+
+You can change this keybind using:
+
+Window:SetStateKeybind(
+    NewKeybind
+)
+
+Example:
+
+Window:SetStateKeybind(
+    Enum.KeyCode.F3
+)
+
+After setting the keybind, pressing F3 will show or hide the GUI.
+
+Other examples:
+
+Window:SetStateKeybind(Enum.KeyCode.F2)
+
+Window:SetStateKeybind(Enum.KeyCode.Insert)
+
+Window:SetStateKeybind(Enum.KeyCode.RightControl)
+
+Window:SetStateKeybind(Enum.KeyCode.Home)
+
+The keybind must be a valid Roblox Enum.KeyCode value.
+
+The method returns true if the keybind was accepted.
+
+Example:
+
+local changed = Window:SetStateKeybind(
+    Enum.KeyCode.F3
+)
+
+if changed then
+    print("GUI keybind changed successfully.")
+end
+
+If an invalid value is provided, the method returns false
+and the library displays a warning.
+
+--------------------------------------------------
+-- GET THE CURRENT WINDOW STATE KEYBIND
+--------------------------------------------------
+
+You can check which keybind is currently assigned using:
+
+Window:GetStateKeybind()
+
+Example:
+
+local CurrentKeybind = Window:GetStateKeybind()
+
+print(CurrentKeybind.Name)
+
+If the keybind is F3, the output will be:
+
+F3
+
+To restore the default keybind, use:
+
+Window:SetStateKeybind(
+    Enum.KeyCode.RightShift
+)
+
+The keybind only controls showing and hiding the GUI.
+It does not destroy the GUI.
+
+To permanently remove the GUI, use:
+
+Window:Destroy()
+
+--------------------------------------------------
 -- CREATE A TAB
 --------------------------------------------------
 
