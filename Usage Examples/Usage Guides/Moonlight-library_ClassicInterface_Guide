@@ -177,6 +177,88 @@ local SettingsTab = Window:CreateTab(
 The first created tab is automatically selected.
 
 --------------------------------------------------
+-- CHANGE A TAB ICON
+--------------------------------------------------
+
+You can change a tab's icon after creating the tab by using:
+
+Tab:SetTabIcon(
+    NewImage
+)
+
+NewImage can be:
+
+"rbxassetid://123456789"
+
+123456789
+
+"https://your-image-url"
+
+Example:
+
+local PlayerTab = Window:CreateTab(
+    "Player",
+    nil,
+    1
+)
+
+PlayerTab:SetTabIcon(
+    "rbxassetid://123456789"
+)
+
+The new image will be applied to:
+
+    - The icon in the sidebar tab.
+    - The large image in the tab's content header
+      if the tab is currently selected.
+
+Numeric asset IDs are also supported:
+
+PlayerTab:SetTabIcon(
+    123456789
+)
+
+The method returns true after updating the icon.
+
+--------------------------------------------------
+-- REMOVE A TAB ICON
+--------------------------------------------------
+
+To remove the custom icon, pass nil:
+
+PlayerTab:SetTabIcon(nil)
+
+When the custom image is removed, the tab displays
+the first letter of the tab name as its fallback icon.
+
+Example:
+
+PlayerTab:SetTabIcon(nil)
+
+--------------------------------------------------
+-- GET THE CURRENT TAB ICON
+--------------------------------------------------
+
+You can retrieve the current icon using:
+
+Tab:GetTabIcon()
+
+Example:
+
+local CurrentIcon = PlayerTab:GetTabIcon()
+
+print(CurrentIcon)
+
+If the tab does not have a custom icon, the result is:
+
+nil
+
+If the tab has an icon, the result is the normalized
+asset string, such as:
+
+rbxassetid://123456789
+
+--------------------------------------------------
 -- CREATE A LABEL
 --------------------------------------------------
 
