@@ -5,9 +5,7 @@ This guide is based on the current ClassicInterface version of MoonLib.
 
 The library is loaded using an executor with loadstring:
 
-local MoonLib = loadstring(game:HttpGet(
-    "YOUR_RAW_LIBRARY_URL"
-))()
+local MoonLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/MoonOFCC/RobloxGUI_Moonlight_Libraries/refs/heads/main/Moonlight%20Classic%20Library/Moonlight-Library_ClassicInterface_V2.lua"))()
 
 The value returned by loadstring is the MoonLib library object.
 
