@@ -859,6 +859,33 @@ function MoonLib:CreateWindow(title, windowImage)
             selectTab(record)
         end
 
+        function Tab:SetTabIcon(newImage)
+            local normalizedImage = normalizeImage(newImage)
+        
+            record.Image = normalizedImage
+        
+            if normalizedImage then
+                setImage(TabIcon, normalizedImage)
+                FallbackIcon.Visible = false
+            else
+                TabIcon.Image = ""
+                TabIcon.Visible = false
+                FallbackIcon.Visible = true
+            end
+        
+            -- Update the large image in the content header
+            -- if this tab is currently selected.
+            if currentTab == record then
+                setImage(HeroImage, normalizedImage)
+            end
+        
+            return true
+        end
+        
+        function Tab:GetTabIcon()
+            return record.Image
+        end
+        
         local function finish(instance)
             updateCanvas(Page, PageLayout)
             return instance
