@@ -1,4 +1,5 @@
 -- MoonUI: a lightweight, client-side Roblox UI library for legitimate Roblox experiences.
+-- #: Upgraded with Dropdown Refresh Support
 
 local MoonUI = {}
 MoonUI.__index = MoonUI
@@ -253,6 +254,7 @@ local function createControls(context, page: ScrollingFrame)
         local arrow = textLabel(header, "⌄", 18, COLORS.muted, true); arrow.TextXAlignment = Enum.TextXAlignment.Center; arrow.Position = UDim2.new(1,-30,0,0); arrow.Size = UDim2.new(0,22,1,0); arrow.ZIndex = 7
         local list = make("ScrollingFrame", {BackgroundColor3 = COLORS.surface, BorderSizePixel = 0, Position = UDim2.new(0,0,0,44), Size = UDim2.new(1,0,0,0), Visible = false, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3, ZIndex = 8}, card)
         corner(list, 8); addListLayout(list, 3)
+
         local function refresh()
             local names = {}
             for _, item in ipairs(items) do if selected[item.key] then table.insert(names,item.value) end end
@@ -261,26 +263,42 @@ local function createControls(context, page: ScrollingFrame)
                 if item.button then item.button.BackgroundColor3 = selected[item.key] and COLORS.accent or COLORS.surfaceHover end
             end
         end
+
         local function callbackValue()
             if not callback then return end
             local names, ids = {}, {}
             for _, item in ipairs(items) do if selected[item.key] then table.insert(names,item.value); table.insert(ids,item.key) end end
             if multi then callback(names, ids) else callback(names[1], ids[1]) end
         end
-        for i, item in ipairs(items) do
-            local option = make("TextButton", {BackgroundColor3 = COLORS.surfaceHover, BorderSizePixel = 0, Size = UDim2.new(1,-8,0,32), Position = UDim2.new(0,4,0,0), Font = Enum.Font.Gotham, Text = "  " .. item.value, TextColor3 = COLORS.text, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false, LayoutOrder = i, ZIndex = 9}, list)
-            corner(option,6); item.button = option
-            option.Activated:Connect(function()
-                if multi then selected[item.key] = not selected[item.key] else selected = {[item.key] = true}; open = false; list.Visible = false; card.Size = UDim2.new(1,-2,0,40); arrow.Text = "⌄" end
-                refresh(); callbackValue()
-            end)
+
+        local function buildItems()
+            -- Clear existing option buttons if rebuilding
+            for _, child in ipairs(list:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child:Destroy()
+                end
+            end
+            
+            for i, item in ipairs(items) do
+                local option = make("TextButton", {BackgroundColor3 = COLORS.surfaceHover, BorderSizePixel = 0, Size = UDim2.new(1,-8,0,32), Position = UDim2.new(0,4,0,0), Font = Enum.Font.Gotham, Text = "  " .. item.value, TextColor3 = COLORS.text, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false, LayoutOrder = i, ZIndex = 9}, list)
+                corner(option,6); item.button = option
+                option.Activated:Connect(function()
+                    if multi then selected[item.key] = not selected[item.key] else selected = {[item.key] = true}; open = false; list.Visible = false; card.Size = UDim2.new(1,-2,0,40); arrow.Text = "⌄" end
+                    refresh(); callbackValue()
+                end)
+            end
+            refresh()
         end
+
+        buildItems()
+
         header.Activated:Connect(function()
             open = not open; list.Visible = open; arrow.Text = open and "⌃" or "⌄"
             local height = math.min(#items * 35, 175)
             list.Size = UDim2.new(1,0,0,open and height or 0)
             card.Size = UDim2.new(1,-2,0,open and (44 + height) or 40)
         end)
+
         local api = {}
         function api:GetValue()
             local names = {}; for _, item in ipairs(items) do if selected[item.key] then table.insert(names,item.value) end end
@@ -300,6 +318,31 @@ local function createControls(context, page: ScrollingFrame)
             end
             refresh(); if notify then callbackValue() end; return true
         end
+        
+        -- NEW: SetOptions / Refresh method added here!
+        function api:SetOptions(newOptions)
+            items = normalizeOptions(newOptions)
+            -- Clear selections that no longer exist
+            local newSelected = {}
+            for _, item in ipairs(items) do
+                if selected[item.key] then
+                    newSelected[item.key] = true
+                end
+            end
+            selected = newSelected
+            
+            buildItems()
+            
+            -- Reset open state visual bounds if list is open
+            if open then
+                local height = math.min(#items * 35, 175)
+                list.Size = UDim2.new(1,0,0,height)
+                card.Size = UDim2.new(1,-2,0,44 + height)
+            else
+                card.Size = UDim2.new(1,-2,0,40)
+            end
+        end
+
         function api:Destroy() card:Destroy() end
         return api
     end
@@ -372,40 +415,6 @@ function MoonUI:CreateWindow(title: string?, options: {[string]: any}?)
         table.insert(self._tabs, tab)
         if #self._tabs == 1 then tab.Select() end
         return tab
-    end
-
-    function window:CreateFloatingWindow(floatingTitle: string?, floatOptions: {[string]: any}?)
-        assert(not self._destroyed, "Window has been destroyed")
-        floatOptions = floatOptions or {}
-        local floating = { _tabs = {}, _destroyed = false, _activeTab = nil }
-        local fw = floatOptions.Width or 360; local fh = floatOptions.Height or 300
-        local panel = make("Frame", {Name = "FloatingWindow", AnchorPoint = Vector2.new(0.5,0.5), Position = floatOptions.Position or UDim2.new(0.72,0,0.55,0), Size = UDim2.new(0,fw,0,fh), BackgroundColor3 = COLORS.background, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 30}, screen)
-        corner(panel,12); stroke(panel,Color3.fromRGB(255,255,255),0.88)
-        local bar = make("Frame", {Name = "Topbar", BackgroundColor3 = COLORS.sidebar, BorderSizePixel = 0, Size = UDim2.new(1,0,0,43), ZIndex = 31}, panel)
-        local flabel = textLabel(bar, floatingTitle or "Floating panel", 14, COLORS.text, true); flabel.Position = UDim2.new(0,14,0,0); flabel.Size = UDim2.new(1,-80,1,0); flabel.ZIndex = 32
-        local minBtn = make("TextButton", {BackgroundTransparency = 1, Position = UDim2.new(1,-62,0,0), Size = UDim2.new(0,28,1,0), Font = Enum.Font.GothamBold, Text = "−", TextColor3 = COLORS.muted, TextSize = 20, ZIndex = 32}, bar)
-        local closeBtn = make("TextButton", {BackgroundTransparency = 1, Position = UDim2.new(1,-34,0,0), Size = UDim2.new(0,28,1,0), Font = Enum.Font.GothamBold, Text = "×", TextColor3 = Color3.fromRGB(255,143,158), TextSize = 20, ZIndex = 32}, bar)
-        draggable(bar,panel)
-        local floatBody = make("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0,0,0,43), Size = UDim2.new(1,0,1,-43), ZIndex = 31}, panel)
-        local fSide = make("Frame", {BackgroundColor3 = COLORS.sidebar, BorderSizePixel = 0, Size = UDim2.new(0,112,1,0), ZIndex = 31}, floatBody)
-        local fTabs = make("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0,7,0,9), Size = UDim2.new(1,-14,1,-18), ZIndex = 31}, fSide); addListLayout(fTabs,4)
-        local fContent = make("Frame", {BackgroundTransparency = 1, Position = UDim2.new(0,122,0,10), Size = UDim2.new(1,-132,1,-20), ZIndex = 31}, floatBody)
-        function floating:CreateTab(name)
-            assert(not self._destroyed, "Floating window has been destroyed")
-            local tab = createTab(self, fTabs, fContent, name)
-            table.insert(self._tabs,tab)
-            if #self._tabs == 1 then tab.Select() end
-            return tab
-        end
-        function floating:SetVisible(visible) panel.Visible = visible == true end
-        function floating:Toggle() panel.Visible = not panel.Visible end
-        function floating:SetPosition(position) panel.Position = position end
-        function floating:GetPosition() return panel.Position end
-        function floating:Destroy() if self._destroyed then return end; self._destroyed = true; panel:Destroy() end
-        minBtn.Activated:Connect(function() floating:SetVisible(false) end)
-        closeBtn.Activated:Connect(function() floating:Destroy() end)
-        table.insert(window._floating, floating)
-        return floating
     end
 
     function window:SetVisible(visible) main.Visible = visible == true end
