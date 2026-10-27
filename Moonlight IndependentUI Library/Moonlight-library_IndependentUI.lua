@@ -1,7 +1,4 @@
---!nonstrict
 -- MoonUI: a lightweight, client-side Roblox UI library for legitimate Roblox experiences.
--- Place this file in a ModuleScript and require it from a LocalScript.
--- No gethui, CoreGui, loadstring, or executor-only APIs are used.
 
 local MoonUI = {}
 MoonUI.__index = MoonUI
