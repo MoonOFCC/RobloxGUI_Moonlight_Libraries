@@ -1,5 +1,6 @@
 -- MoonUI: a lightweight, client-side Roblox UI library for legitimate Roblox experiences.
 -- #: Upgraded with Dropdown Refresh Support
+-- #: Upgraded with Floating Window support (window:CreateFloatingWindow)
 
 local MoonUI = {}
 MoonUI.__index = MoonUI
@@ -417,11 +418,173 @@ function MoonUI:CreateWindow(title: string?, options: {[string]: any}?)
         return tab
     end
 
+    -- # NEW: independent, draggable, resizable floating mini-windows.
+    -- Each one gets its own ScreenGui so it can sit outside/above the main
+    -- window, and its own scrolling page with the full Create* control set.
+    function window:CreateFloatingWindow(title, options)
+        assert(not self._destroyed, "Window has been destroyed")
+        options = options or {}
+        local owner = self
+
+        owner._floatingCount = (owner._floatingCount or 0) + 1
+        local index = owner._floatingCount
+
+        local floatW = tonumber(options.Width) or 300
+        local floatH = tonumber(options.Height) or 200
+        local minW = tonumber(options.MinWidth) or 180
+        local minH = tonumber(options.MinHeight) or 120
+        local guiParent = owner.ScreenGui.Parent
+
+        local gui = make("ScreenGui", {
+            Name = options.Name or ("MoonUI_Floating_" .. tostring(index)),
+            ResetOnSpawn = false,
+            ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+            DisplayOrder = options.DisplayOrder or (owner.ScreenGui.DisplayOrder + index),
+        }, guiParent)
+
+        local frame = make("Frame", {
+            Name = "Floating",
+            Position = options.Position or UDim2.new(0.5, -floatW / 2, 0.5, -floatH / 2),
+            Size = UDim2.new(0, floatW, 0, floatH),
+            BackgroundColor3 = COLORS.background,
+            BorderSizePixel = 0,
+            ClipsDescendants = true,
+        }, gui)
+        corner(frame, 10)
+        stroke(frame, Color3.fromRGB(255, 255, 255), 0.91)
+
+        local topbar = make("Frame", {
+            Name = "Topbar",
+            BackgroundColor3 = COLORS.background,
+            BorderSizePixel = 0,
+            Size = UDim2.new(1, 0, 0, 34),
+        }, frame)
+        local floatTitle = textLabel(topbar, title or "Floating", 14, COLORS.text, true)
+        floatTitle.Position = UDim2.new(0, 12, 0, 0)
+        floatTitle.Size = UDim2.new(1, -76, 1, 0)
+
+        local minimize = make("TextButton", {
+            BackgroundColor3 = COLORS.surface,
+            BorderSizePixel = 0,
+            Position = UDim2.new(1, -58, 0.5, -12),
+            Size = UDim2.new(0, 24, 0, 24),
+            Font = Enum.Font.GothamBold,
+            Text = "−",
+            TextColor3 = COLORS.text,
+            TextSize = 16,
+            AutoButtonColor = false,
+        }, topbar)
+        corner(minimize, 6)
+
+        local floatClose = make("TextButton", {
+            BackgroundColor3 = Color3.fromRGB(77, 43, 52),
+            BorderSizePixel = 0,
+            Position = UDim2.new(1, -30, 0.5, -12),
+            Size = UDim2.new(0, 24, 0, 24),
+            Font = Enum.Font.GothamBold,
+            Text = "×",
+            TextColor3 = Color3.fromRGB(255, 143, 158),
+            TextSize = 16,
+            AutoButtonColor = false,
+        }, topbar)
+        corner(floatClose, 6)
+
+        draggable(topbar, frame)
+
+        local floatContent = make("Frame", {
+            Name = "Content",
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 6, 0, 38),
+            Size = UDim2.new(1, -12, 1, -44),
+        }, frame)
+        local page = makePage(floatContent)
+        page.Visible = true -- makePage() starts pages hidden for the tab system
+
+        local controls = createControls(self, page)
+
+        -- resize grip, bottom-right corner
+        local grip = make("TextButton", {
+            BackgroundTransparency = 1,
+            Position = UDim2.new(1, -16, 1, -16),
+            Size = UDim2.new(0, 16, 0, 16),
+            Font = Enum.Font.GothamBold,
+            Text = "◢",
+            TextColor3 = COLORS.muted,
+            TextSize = 9,
+            TextXAlignment = Enum.TextXAlignment.Right,
+            TextYAlignment = Enum.TextYAlignment.Bottom,
+            AutoButtonColor = false,
+            ZIndex = 3,
+        }, frame)
+
+        local resizing = false
+        local resizeStartPos = nil
+        local resizeStartSize = nil
+        grip.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                resizing = true
+                resizeStartPos = input.Position
+                resizeStartSize = frame.AbsoluteSize
+            end
+        end)
+        local gripMove = UserInputService.InputChanged:Connect(function(input)
+            if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - resizeStartPos
+                frame.Size = UDim2.new(
+                    0, math.max(resizeStartSize.X + delta.X, minW),
+                    0, math.max(resizeStartSize.Y + delta.Y, minH)
+                )
+            end
+        end)
+        local gripEnd = UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                resizing = false
+            end
+        end)
+
+        local floating = {
+            Name = gui.Name,
+            ScreenGui = gui,
+            Frame = frame,
+            Page = page,
+            _destroyed = false,
+        }
+        for key, method in pairs(controls) do
+            if type(method) == "function" then floating[key] = method end
+        end
+
+        function floating:SetVisible(visible) frame.Visible = visible == true end
+        function floating:Toggle() frame.Visible = not frame.Visible end
+        function floating:SetTitle(text) floatTitle.Text = tostring(text) end
+        function floating:SetPosition(position) frame.Position = position end
+        function floating:SetSize(size) frame.Size = size end
+        function floating:Destroy()
+            if floating._destroyed then return end
+            floating._destroyed = true
+            gripMove:Disconnect()
+            gripEnd:Disconnect()
+            for i = #owner._floating, 1, -1 do
+                if owner._floating[i] == floating then table.remove(owner._floating, i) end
+            end
+            gui:Destroy()
+        end
+
+        minimize.Activated:Connect(function() floating:SetVisible(false) end)
+        floatClose.Activated:Connect(function() floating:Destroy() end)
+
+        table.insert(owner._floating, floating)
+        return floating
+    end
+
     function window:SetVisible(visible) main.Visible = visible == true end
     function window:Toggle() main.Visible = not main.Visible end
     function window:Destroy()
         if self._destroyed then return end
         self._destroyed = true
+        -- close every floating window this main window owns first
+        for i = #self._floating, 1, -1 do
+            self._floating[i]:Destroy()
+        end
         screen:Destroy()
     end
     hide.Activated:Connect(function() window:SetVisible(false) end)
