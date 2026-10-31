@@ -1,5 +1,6 @@
 -- MoonUI: a lightweight, client-side Roblox UI library for legitimate Roblox experiences.
 -- #: Upgraded with Dropdown Refresh Support
+
 -- #: Upgraded with Floating Window support (window:CreateFloatingWindow)
 
 local MoonUI = {}
@@ -421,6 +422,7 @@ function MoonUI:CreateWindow(title: string?, options: {[string]: any}?)
     -- # NEW: independent, draggable, resizable floating mini-windows.
     -- Each one gets its own ScreenGui so it can sit outside/above the main
     -- window, and its own scrolling page with the full Create* control set.
+    -- monitor:CreateTab(name) also works: floating windows host their own tab strip.
     function window:CreateFloatingWindow(title, options)
         assert(not self._destroyed, "Window has been destroyed")
         options = options or {}
@@ -547,6 +549,8 @@ function MoonUI:CreateWindow(title: string?, options: {[string]: any}?)
             ScreenGui = gui,
             Frame = frame,
             Page = page,
+            _tabs = {},
+            _activeTab = nil,
             _destroyed = false,
         }
         for key, method in pairs(controls) do
@@ -558,6 +562,101 @@ function MoonUI:CreateWindow(title: string?, options: {[string]: any}?)
         function floating:SetTitle(text) floatTitle.Text = tostring(text) end
         function floating:SetPosition(position) frame.Position = position end
         function floating:SetSize(size) frame.Size = size end
+
+        -- # mini tab system: floating windows can host tabs just like the
+        -- main window. The strip is created lazily on the first CreateTab
+        -- call, so floating windows without tabs keep the full-height page.
+        local tabStrip = nil
+        local pageHolder = nil
+
+        local function ensureTabStrip()
+            if tabStrip then return end
+            tabStrip = make("ScrollingFrame", {
+                Name = "TabStrip",
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Position = UDim2.new(0, 6, 0, 38),
+                Size = UDim2.new(1, -12, 0, 28),
+                CanvasSize = UDim2.new(),
+                AutomaticCanvasSize = Enum.AutomaticSize.X,
+                ScrollBarThickness = 2,
+                ScrollBarImageColor3 = COLORS.muted,
+            }, frame)
+            local stripLayout = addListLayout(tabStrip, 4)
+            stripLayout.FillDirection = Enum.FillDirection.Horizontal
+            stripLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            pageHolder = make("Frame", {
+                Name = "TabPages",
+                BackgroundTransparency = 1,
+                Size = UDim2.fromScale(1, 1),
+            }, floatContent)
+            -- hand the space under the strip to the tab pages
+            page.Visible = false
+            floatContent.Position = UDim2.new(0, 6, 0, 70)
+            floatContent.Size = UDim2.new(1, -12, 1, -76)
+        end
+
+        function floating:CreateTab(name)
+            assert(not floating._destroyed, "Floating window has been destroyed")
+            ensureTabStrip()
+            local owner = floating
+            local tab = {Name = tostring(name)}
+            local button = make("TextButton", {
+                BackgroundColor3 = COLORS.accent,
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Size = UDim2.new(0, 0, 1, 0),
+                AutomaticSize = Enum.AutomaticSize.X,
+                Font = Enum.Font.GothamSemibold,
+                Text = tostring(name),
+                TextColor3 = COLORS.muted,
+                TextSize = 12,
+                AutoButtonColor = false,
+            }, tabStrip)
+            local pad = Instance.new("UIPadding")
+            pad.PaddingLeft = UDim.new(0, 10)
+            pad.PaddingRight = UDim.new(0, 10)
+            pad.Parent = button
+            corner(button, 7)
+            local tabPage = makePage(pageHolder)
+            tab.Page, tab.Button = tabPage, button
+            local function select()
+                if owner._activeTab then
+                    owner._activeTab.Page.Visible = false
+                    owner._activeTab.Button.BackgroundTransparency = 1
+                    owner._activeTab.Button.TextColor3 = COLORS.muted
+                end
+                owner._activeTab = tab
+                tabPage.Visible = true
+                button.BackgroundTransparency = 0
+                button.TextColor3 = COLORS.text
+            end
+            button.Activated:Connect(select)
+            local tabControls = createControls(owner, tabPage)
+            for key, method in pairs(tabControls) do
+                if type(method) == "function" then tab[key] = method end
+            end
+            tab.Select = select
+            function tab:Destroy()
+                if owner._activeTab == tab then owner._activeTab = nil end
+                for i = #owner._tabs, 1, -1 do
+                    if owner._tabs[i] == tab then table.remove(owner._tabs, i) end
+                end
+                button:Destroy()
+                tabPage:Destroy()
+                if #owner._tabs == 0 and tabStrip then
+                    -- last tab gone: restore the plain full-height page
+                    tabStrip:Destroy(); tabStrip = nil
+                    pageHolder:Destroy(); pageHolder = nil
+                    page.Visible = true
+                    floatContent.Position = UDim2.new(0, 6, 0, 38)
+                    floatContent.Size = UDim2.new(1, -12, 1, -44)
+                end
+            end
+            table.insert(owner._tabs, tab)
+            if #owner._tabs == 1 then select() end
+            return tab
+        end
         function floating:Destroy()
             if floating._destroyed then return end
             floating._destroyed = true
