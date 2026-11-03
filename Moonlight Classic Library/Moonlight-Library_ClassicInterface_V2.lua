@@ -1,5 +1,5 @@
 --[[
-    MoonLib - Modern Guild Interface
+    MoonLib - Classic Interface
 
     Executor-compatible UI library.
 
@@ -54,6 +54,19 @@
             customColor,
             multiSelect
         )
+
+    Dropdown extras:
+
+        options can be a table OR a function returning a table.
+        A function is re-evaluated on every open and on Refresh(),
+        so the list can stay live (e.g. players in the server).
+
+        Dropdown:Refresh(newOptions, callCallback)
+        Dropdown:SetOptions(newOptions, callCallback)
+        Dropdown:GetOptions()          -- values, ids
+        Dropdown:SetRefreshOnOpen(bool)
+        Dropdown:GetSource()
+        Dropdown:IsOpen()
 
     Additional reference-style controls:
 
@@ -1554,8 +1567,10 @@ function MoonLib:CreateWindow(title, windowImage)
             multiSelect
         )
             assert(
-                type(options) == "table",
-                "MoonLib CreateDropdown options must be a table"
+                type(options) == "table"
+                    or type(options) == "function",
+                "MoonLib CreateDropdown options must be a table "
+                    .. "or a function returning a table"
             )
 
             local isMulti =
@@ -1565,29 +1580,14 @@ function MoonLib:CreateWindow(title, windowImage)
                     and string.lower(multiSelect) == "multi"
                 )
 
+            -- `currentSource` is re-evaluated on every open and on
+            -- Refresh(). Refresh(newOptions) replaces it permanently,
+            -- so a manual update is not undone by the next open.
+            local currentSource = options
+            local refreshOnOpen = true
+
             local sortedOptions = {}
-
-            for key, value in pairs(options) do
-                if type(value) == "string"
-                    or type(value) == "number" then
-
-                    table.insert(sortedOptions, {
-                        Key = key,
-                        Value = tostring(value),
-                        Selected = false,
-                    })
-                end
-            end
-
-            table.sort(sortedOptions, function(a, b)
-                if type(a.Key) == "number"
-                    and type(b.Key) == "number" then
-
-                    return a.Key < b.Key
-                end
-
-                return tostring(a.Key) < tostring(b.Key)
-            end)
+            local optionButtons = {}
 
             local baseColor = customColor or Theme.Card
             local isOpen = false
@@ -1688,7 +1688,35 @@ function MoonLib:CreateWindow(title, windowImage)
                 Padding = UDim.new(0, 4),
             })
 
-            local optionButtons = {}
+            local function resolveOptions(source)
+                local result = source
+
+                if type(result) == "function" then
+                    local success, returned = pcall(result)
+
+                    if not success then
+                        warn(
+                            "MoonLib dropdown options function failed: "
+                            .. tostring(returned)
+                        )
+
+                        return {}
+                    end
+
+                    result = returned
+                end
+
+                if type(result) ~= "table" then
+                    warn(
+                        "MoonLib dropdown options must be a table "
+                        .. "or a function returning a table"
+                    )
+
+                    return {}
+                end
+
+                return result
+            end
 
             local function getSelection()
                 local selectedNames = {}
@@ -1790,61 +1818,123 @@ function MoonLib:CreateWindow(title, windowImage)
                 end
             end
 
-            for index, option in ipairs(sortedOptions) do
-                local OptionButton = create("TextButton", {
-                    Name = "Option_" .. tostring(index),
-                    Parent = OptionsFrame,
-                    BackgroundColor3 = Theme.PanelLight,
-                    BorderSizePixel = 0,
-                    Size = UDim2.new(1, -8, 0, 36),
-                    Font = Enum.Font.GothamBold,
-                    Text = option.Value,
-                    TextColor3 = Theme.Text,
-                    TextSize = 14,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    AutoButtonColor = false,
-                    LayoutOrder = index,
-                    ZIndex = 41,
-                })
+            -- Rebuild the option list from `currentSource`. This is the
+            -- only place options are read, so Refresh() and open-time
+            -- refresh always produce a fresh list.
+            local function rebuildOptions(newSource)
+                if newSource ~= nil then
+                    currentSource = newSource
+                end
 
-                OptionButton.Position = UDim2.new(0, 4, 0, 0)
+                local source = resolveOptions(currentSource)
 
-                addCorner(OptionButton, 2)
+                -- Keep selections whose displayed value still exists.
+                local selectedBefore = {}
 
-                optionButtons[option] = OptionButton
+                for _, option in ipairs(sortedOptions) do
+                    if option.Selected then
+                        selectedBefore[option.Value] = true
+                    end
+                end
 
-                OptionButton.MouseEnter:Connect(function()
-                    makeTween(OptionButton, 0.12, {
-                        BackgroundColor3 = option.Selected
-                            and Theme.BlueLight
-                            or Theme.CardHover,
+                for _, button in pairs(optionButtons) do
+                    pcall(function()
+                        button:Destroy()
+                    end)
+                end
+
+                for index = #sortedOptions, 1, -1 do
+                    sortedOptions[index] = nil
+                end
+
+                for key in pairs(optionButtons) do
+                    optionButtons[key] = nil
+                end
+
+                for key, value in pairs(source) do
+                    if type(value) == "string"
+                        or type(value) == "number" then
+
+                        table.insert(sortedOptions, {
+                            Key = key,
+                            Value = tostring(value),
+                            Selected =
+                                selectedBefore[tostring(value)] == true,
+                        })
+                    end
+                end
+
+                table.sort(sortedOptions, function(a, b)
+                    if type(a.Key) == "number"
+                        and type(b.Key) == "number" then
+
+                        return a.Key < b.Key
+                    end
+
+                    return tostring(a.Key) < tostring(b.Key)
+                end)
+
+                for index, option in ipairs(sortedOptions) do
+                    local OptionButton = create("TextButton", {
+                        Name = "Option_" .. tostring(index),
+                        Parent = OptionsFrame,
+                        BackgroundColor3 = Theme.PanelLight,
+                        BorderSizePixel = 0,
+                        Size = UDim2.new(1, -8, 0, 36),
+                        Font = Enum.Font.GothamBold,
+                        Text = option.Value,
+                        TextColor3 = Theme.Text,
+                        TextSize = 14,
+                        TextXAlignment = Enum.TextXAlignment.Left,
+                        AutoButtonColor = false,
+                        LayoutOrder = index,
+                        ZIndex = 41,
                     })
-                end)
 
-                OptionButton.MouseLeave:Connect(function()
-                    refreshOption(option)
-                end)
+                    OptionButton.Position = UDim2.new(0, 4, 0, 0)
 
-                OptionButton.MouseButton1Click:Connect(function()
-                    if isMulti then
-                        option.Selected = not option.Selected
-                    else
-                        for _, other in ipairs(sortedOptions) do
-                            other.Selected = false
+                    addCorner(OptionButton, 2)
+
+                    optionButtons[option] = OptionButton
+
+                    OptionButton.MouseEnter:Connect(function()
+                        makeTween(OptionButton, 0.12, {
+                            BackgroundColor3 = option.Selected
+                                and Theme.BlueLight
+                                or Theme.CardHover,
+                        })
+                    end)
+
+                    OptionButton.MouseLeave:Connect(function()
+                        refreshOption(option)
+                    end)
+
+                    OptionButton.MouseButton1Click:Connect(function()
+                        if isMulti then
+                            option.Selected = not option.Selected
+                        else
+                            for _, other in ipairs(sortedOptions) do
+                                other.Selected = false
+                            end
+
+                            option.Selected = true
+                            isOpen = false
                         end
 
-                        option.Selected = true
-                        isOpen = false
-                    end
+                        for _, other in ipairs(sortedOptions) do
+                            refreshOption(other)
+                        end
 
-                    for _, other in ipairs(sortedOptions) do
-                        refreshOption(other)
-                    end
+                        refreshHeader()
+                        updateDropdownSize()
+                        fireCallback()
+                    end)
 
-                    refreshHeader()
-                    updateDropdownSize()
-                    fireCallback()
-                end)
+                    refreshOption(option)
+                end
+
+                refreshHeader()
+                updateDropdownSize()
             end
 
             Header.MouseEnter:Connect(function()
@@ -1861,7 +1951,13 @@ function MoonLib:CreateWindow(title, windowImage)
 
             Header.MouseButton1Click:Connect(function()
                 isOpen = not isOpen
-                updateDropdownSize()
+
+                -- Re-read the options every time the list expands.
+                if isOpen and refreshOnOpen then
+                    rebuildOptions()
+                else
+                    updateDropdownSize()
+                end
             end)
 
             local DropdownObject = {
@@ -1899,6 +1995,10 @@ function MoonLib:CreateWindow(title, windowImage)
             function DropdownObject:SetOpen(value)
                 isOpen = value == true
                 updateDropdownSize()
+            end
+
+            function DropdownObject:IsOpen()
+                return isOpen
             end
 
             function DropdownObject:Clear(callCallback)
@@ -1965,11 +2065,54 @@ function MoonLib:CreateWindow(title, windowImage)
                 return matched
             end
 
+            -- ------------------------------------------------------
+            -- NEW: force the option list to update.
+            --
+            --   Refresh()                 re-read the source now
+            --   Refresh({"A", "B"})       replace the source with a
+            --                            new table, then rebuild
+            --   Refresh(getList, true)    also fire the callback with
+            --                            the resulting selection
+            -- ------------------------------------------------------
+            function DropdownObject:Refresh(newOptions, callCallback)
+                rebuildOptions(newOptions)
+
+                if callCallback and callback then
+                    fireCallback()
+                end
+
+                return true
+            end
+
+            function DropdownObject:SetOptions(newOptions, callCallback)
+                return self:Refresh(newOptions, callCallback)
+            end
+
+            function DropdownObject:GetOptions()
+                local values = {}
+                local ids = {}
+
+                for _, option in ipairs(sortedOptions) do
+                    table.insert(values, option.Value)
+                    table.insert(ids, option.Key)
+                end
+
+                return values, ids
+            end
+
+            function DropdownObject:SetRefreshOnOpen(value)
+                refreshOnOpen = value == true
+            end
+
+            function DropdownObject:GetSource()
+                return currentSource
+            end
+
             function DropdownObject:Destroy()
                 DropdownFrame:Destroy()
             end
 
-            updateDropdownSize()
+            rebuildOptions()
 
             return finish(DropdownObject)
         end
