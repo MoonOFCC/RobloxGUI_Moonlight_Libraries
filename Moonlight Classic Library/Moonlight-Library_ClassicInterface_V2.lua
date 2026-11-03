@@ -76,6 +76,28 @@
             Textbox:Focus()
             Textbox:Destroy()
 
+    Window appearance methods:
+
+        Window:SetMainColor(color)
+        Window:GetMainColor()
+        Window:SetBackground(colorOrImageOrConfig)
+        Window:GetBackground()
+        Window:SetBackgroundTransparency(transparency)
+        Window:SetTitle(title)
+        Window:GetTitle()
+        Window:SetWindowImage(image)
+        Window:SetSize(UDim2)
+        Window:SetPosition(UDim2)
+        Window:SetVisible(bool)
+        Window:IsVisible()
+
+    SetBackground accepts a Color3, image asset ID/string, or a config table:
+        { Image = "rbxassetid://...", Rows = 4, Columns = 4,
+          FrameCount = 16, FrameRate = 12, ImageTransparency = 0 }
+
+    Sprite-sheet animation uses ImageRectSize / ImageRectOffset.
+    Roblox ImageLabels require image content IDs; raw external URLs may
+    not load unless the runtime supports them.
 
     Dropdown extras:
 
@@ -350,12 +372,28 @@ function MoonLib:CreateWindow(title, windowImage)
 
     addStroke(InnerFrame, Theme.Border, 1, 0.22)
 
-    addGradient(
+    local InnerGradient = addGradient(
         InnerFrame,
         Color3.fromRGB(13, 25, 31),
         Color3.fromRGB(5, 8, 10),
         90
     )
+
+    -- Kept behind the interface panels so the window can use a solid or
+    -- image-based background without covering tabs and controls.
+    local BackgroundImage = create("ImageLabel", {
+        Name = "BackgroundImage",
+        Parent = MainFrame,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0, 5, 0, 5),
+        Size = UDim2.new(1, -10, 1, -10),
+        Image = "",
+        ImageTransparency = 0,
+        ScaleType = Enum.ScaleType.Crop,
+        Visible = false,
+        ZIndex = 2,
+    })
 
     local TopBar = create("Frame", {
         Name = "TopBar",
@@ -481,6 +519,8 @@ function MoonLib:CreateWindow(title, windowImage)
         Theme.Text
     )
 
+    local stopBackgroundAnimation
+
     local function toggleWindow()
         if destroyed then
             return
@@ -505,6 +545,7 @@ function MoonLib:CreateWindow(title, windowImage)
             end)
         end
 
+        stopBackgroundAnimation()
         ScreenGui:Destroy()
     end)
 
@@ -2338,7 +2379,238 @@ function MoonLib:CreateWindow(title, windowImage)
             end)
         end
 
+        stopBackgroundAnimation()
         ScreenGui:Destroy()
+    end
+
+    -- // Window appearance API
+
+    local mainColor = Theme.Blue
+    local backgroundValue = Theme.MainBackground
+    local backgroundTransparency = 0
+    local backgroundAnimationConnection = nil
+    local backgroundAnimationToken = 0
+
+    stopBackgroundAnimation = function()
+        backgroundAnimationToken += 1
+        if backgroundAnimationConnection then
+            backgroundAnimationConnection:Disconnect()
+            backgroundAnimationConnection = nil
+        end
+        BackgroundImage.ImageRectOffset = Vector2.zero
+        BackgroundImage.ImageRectSize = Vector2.zero
+    end
+
+    local function replaceColorInGui(oldColor, newColor)
+        for _, object in ipairs(ScreenGui:GetDescendants()) do
+            pcall(function()
+                if object:IsA("GuiObject") then
+                    if object.BackgroundColor3 == oldColor then
+                        object.BackgroundColor3 = newColor
+                    end
+                    if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+                        if object.TextColor3 == oldColor then
+                            object.TextColor3 = newColor
+                        end
+                    end
+                    if object:IsA("ImageLabel") or object:IsA("ImageButton") then
+                        if object.ImageColor3 == oldColor then
+                            object.ImageColor3 = newColor
+                        end
+                    end
+                elseif object:IsA("UIStroke") then
+                    if object.Color == oldColor then
+                        object.Color = newColor
+                    end
+                elseif object:IsA("UIGradient") then
+                    local keypoints = {}
+                    for _, keypoint in ipairs(object.Color.Keypoints) do
+                        local color = keypoint.Value == oldColor and newColor or keypoint.Value
+                        table.insert(keypoints, ColorSequenceKeypoint.new(keypoint.Time, color))
+                    end
+                    object.Color = ColorSequence.new(keypoints)
+                end
+            end)
+        end
+    end
+
+    function Window:SetMainColor(color)
+        assert(typeof(color) == "Color3", "SetMainColor expects a Color3")
+
+        local oldBlue = Theme.Blue
+        local oldBlueLight = Theme.BlueLight
+        local oldBlueDark = Theme.BlueDark
+        local oldHeaderGradient = Color3.fromRGB(30, 67, 90)
+
+        local newLight = color:Lerp(Color3.new(1, 1, 1), 0.28)
+        local newDark = color:Lerp(Color3.new(0, 0, 0), 0.48)
+        local newHeaderGradient = color:Lerp(Color3.new(0, 0, 0), 0.58)
+
+        replaceColorInGui(oldBlue, color)
+        replaceColorInGui(oldBlueLight, newLight)
+        replaceColorInGui(oldBlueDark, newDark)
+        replaceColorInGui(oldHeaderGradient, newHeaderGradient)
+
+        Theme.Blue = color
+        Theme.BlueLight = newLight
+        Theme.BlueDark = newDark
+        mainColor = color
+
+        HeaderLine.BackgroundColor3 = color
+        if TopBarGradient then
+            TopBarGradient.Color = ColorSequence.new(color, newHeaderGradient)
+        end
+
+        return true
+    end
+
+    function Window:GetMainColor()
+        return mainColor
+    end
+
+    function Window:SetBackground(value)
+        stopBackgroundAnimation()
+        backgroundValue = value
+
+        if typeof(value) == "Color3" then
+            BackgroundImage.Visible = false
+            BackgroundImage.Image = ""
+            MainFrame.BackgroundColor3 = value
+            InnerFrame.BackgroundColor3 = value
+            InnerFrame.BackgroundTransparency = 1
+            InnerGradient.Enabled = false
+            backgroundTransparency = 0
+            return true
+        end
+
+        local config = type(value) == "table" and value or nil
+        local image = config and (config.Image or config.image) or value
+        local normalized = normalizeImage(image)
+
+        if not normalized then
+            BackgroundImage.Visible = false
+            BackgroundImage.Image = ""
+            MainFrame.BackgroundColor3 = Theme.MainBackground
+            InnerFrame.BackgroundTransparency = 1
+            InnerGradient.Enabled = false
+            return false
+        end
+
+        -- Standard Roblox ImageLabels use asset content IDs. In executor
+        -- environments that expose these file APIs, allow HTTP images by
+        -- downloading them and converting the file into a custom asset.
+        if normalized:match("^https?://")
+            and type(getcustomasset) == "function"
+            and type(writefile) == "function"
+            and type(game.HttpGet) == "function" then
+
+            local success, customAsset = pcall(function()
+                local response = game:HttpGet(normalized)
+                local extension = normalized:match("%.([%w]+)[%?]?.*$") or "png"
+                local fileName = "MoonLibBackground_" .. tostring(math.floor(os.clock() * 100000)) .. "." .. extension
+                writefile(fileName, response)
+                return getcustomasset(fileName)
+            end)
+
+            if success and customAsset then
+                normalized = customAsset
+            end
+        end
+
+        MainFrame.BackgroundColor3 = Theme.MainBackground
+        InnerFrame.BackgroundTransparency = 1
+        InnerGradient.Enabled = false
+        local imageSuccess = pcall(function()
+            BackgroundImage.Image = normalized
+        end)
+        if not imageSuccess then
+            BackgroundImage.Visible = false
+            return false
+        end
+        BackgroundImage.ImageTransparency = math.clamp(config and (config.ImageTransparency or config.Transparency) or 0, 0, 1)
+        BackgroundImage.ScaleType = config and config.ScaleType or Enum.ScaleType.Crop
+        BackgroundImage.Visible = true
+
+        local rows = math.max(1, math.floor(config and config.Rows or 1))
+        local columns = math.max(1, math.floor(config and config.Columns or 1))
+        local frameCount = math.max(1, math.floor(config and config.FrameCount or rows * columns))
+        local frameRate = math.max(1, tonumber(config and config.FrameRate) or 12)
+
+        if frameCount > 1 and (rows > 1 or columns > 1) then
+            local imageSize = config and config.ImageSize
+            if typeof(imageSize) ~= "Vector2" then
+                imageSize = Vector2.new(1024, 1024)
+            end
+            local frameSize = Vector2.new(imageSize.X / columns, imageSize.Y / rows)
+            BackgroundImage.ImageRectSize = frameSize
+
+            local frame = 0
+            local elapsed = 0
+            local token = backgroundAnimationToken
+            backgroundAnimationConnection = RunService.Heartbeat:Connect(function(deltaTime)
+                if destroyed or token ~= backgroundAnimationToken then
+                    return
+                end
+                elapsed += deltaTime
+                local frameDuration = 1 / frameRate
+                if elapsed >= frameDuration then
+                    local steps = math.floor(elapsed / frameDuration)
+                    elapsed -= steps * frameDuration
+                    frame = (frame + steps) % frameCount
+                    local column = frame % columns
+                    local row = math.floor(frame / columns)
+                    BackgroundImage.ImageRectOffset = Vector2.new(column * frameSize.X, row * frameSize.Y)
+                end
+            end)
+        end
+
+        return true
+    end
+
+    function Window:GetBackground()
+        return backgroundValue
+    end
+
+    function Window:SetBackgroundTransparency(transparency)
+        transparency = math.clamp(tonumber(transparency) or 0, 0, 1)
+        backgroundTransparency = transparency
+        BackgroundImage.ImageTransparency = transparency
+        if not BackgroundImage.Visible then
+            MainFrame.BackgroundTransparency = transparency
+        end
+        return true
+    end
+
+    function Window:GetBackgroundTransparency()
+        return backgroundTransparency
+    end
+
+    function Window:SetTitle(newTitle)
+        WindowTitle.Text = tostring(newTitle or "")
+    end
+
+    function Window:GetTitle()
+        return WindowTitle.Text
+    end
+
+    function Window:SetWindowImage(image)
+        setImage(WindowImage, image)
+        WindowTitle.Position = UDim2.new(0, normalizeImage(image) and 72 or 18, 0, 0)
+    end
+
+    function Window:SetSize(size)
+        assert(typeof(size) == "UDim2", "SetSize expects a UDim2")
+        MainFrame.Size = size
+    end
+
+    function Window:SetPosition(position)
+        assert(typeof(position) == "UDim2", "SetPosition expects a UDim2")
+        MainFrame.Position = position
+    end
+
+    function Window:SetVisible(state)
+        visible = state == true
+        MainFrame.Visible = visible
     end
 
     Window.ScreenGui = ScreenGui
