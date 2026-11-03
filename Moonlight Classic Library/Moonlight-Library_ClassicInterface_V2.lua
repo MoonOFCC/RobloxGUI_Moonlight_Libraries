@@ -16,24 +16,50 @@
             1
         )
 
-    Supported controls:
+    Tab methods:
+
+        Tab:SetTabIcon(image)
+            Changes the tab's icon.
+            Accepts an image asset ID, number, or image string.
+            Pass nil or an empty string to restore the fallback icon.
+
+        Tab:GetTabIcon()
+            Returns the current tab icon.
+
+    Tab elements:
 
         Tab:CreateLabel(text, order, color)
+            Creates a text label.
+            Returns the TextLabel instance.
 
-        Tab:CreateButton(
-            text,
-            callback,
-            customColor,
-            order
-        )
+        Tab:CreateHeader(title, subtitle, order)
+            Creates a section header with an optional subtitle.
+            Returns the Frame instance.
 
-        Tab:CreateToggle(
-            text,
-            default,
-            callback,
-            order,
-            customColor
-        )
+        Tab:CreateInfoCard(title, description, accentColor, order)
+            Creates an informational card.
+            Returns the Frame instance.
+
+        Tab:CreateStatCard(title, value, accentColor, order)
+            Creates a statistic card.
+            Returns the Frame instance.
+
+        Tab:CreateButton(text, callback, customColor, order)
+            Creates a clickable button.
+            callback() is called when clicked.
+            Returns the TextButton instance.
+
+        Tab:CreateToggle(text, default, callback, order, customColor)
+            Creates a toggle.
+            callback(enabled) is called when its state changes.
+            Returns a ToggleObject.
+
+            ToggleObject methods:
+
+                :GetValue()
+                :SetValue(value, callCallback)
+                :Toggle()
+                :Destroy()
 
         Tab:CreateSlider(
             text,
@@ -45,15 +71,19 @@
             order,
             customColor
         )
+            Creates a slider with an enable/disable state.
+            callback(enabled, value) is called when the slider
+            value or enabled state changes.
 
-        Tab:CreateDropdown(
-            text,
-            options,
-            callback,
-            order,
-            customColor,
-            multiSelect
-        )
+            Returns a SliderObject.
+
+            SliderObject methods:
+
+                :GetValue()
+                :IsEnabled()
+                :SetValue(value, callCallback)
+                :SetEnabled(value, callCallback)
+                :Destroy()
 
         Tab:CreateTextbox(
             text,
@@ -63,78 +93,129 @@
             customColor,
             defaultValue
         )
+            Creates a text input.
+            callback(value, enterPressed) is called when the
+            input loses focus.
 
-        Textbox callback:
-            callback(value, enterPressed) is called when the input loses focus.
+            Returns a TextboxObject.
 
-        Textbox extras:
+            TextboxObject methods:
 
-            Textbox:GetValue()
-            Textbox:SetValue(value, callCallback)
-            Textbox:Clear(callCallback)
-            Textbox:SetPlaceholder(placeholder)
-            Textbox:Focus()
-            Textbox:Destroy()
+                :GetValue()
+                :SetValue(value, callCallback)
+                :Clear(callCallback)
+                :SetPlaceholder(placeholder)
+                :Focus()
+                :Destroy()
+
+        Tab:CreateDropdown(
+            text,
+            options,
+            callback,
+            order,
+            customColor,
+            multiSelect
+        )
+            Creates a dropdown.
+
+            options can be:
+                - A table of options.
+                - A function returning a table of options.
+
+            multiSelect:
+                true or "multi" enables multiple selection.
+                Otherwise, the dropdown uses single selection.
+
+            Callback behavior:
+
+                Single selection:
+                    callback(value, id)
+
+                Multiple selection:
+                    callback(values, ids)
+
+            Returns a DropdownObject.
+
+            DropdownObject methods:
+
+                :GetValue()
+                :GetIds()
+                :GetSelection()
+                :GetMode()
+                :SetOpen(value)
+                :IsOpen()
+                :Clear(callCallback)
+                :SetValue(value, callCallback)
+                :Refresh(newOptions, callCallback)
+                :SetOptions(newOptions, callCallback)
+                :GetOptions()
+                :SetRefreshOnOpen(value)
+                :GetSource()
+                :Destroy()
+
+            Dropdown notes:
+
+                Options supplied through a function are re-evaluated
+                when the dropdown opens, if refresh-on-open is enabled.
+
+                Refresh() rebuilds the current options.
+                Refresh(newOptions) replaces the current options source.
 
     Window appearance methods:
 
         Window:SetMainColor(color)
         Window:GetMainColor()
+
         Window:SetBackground(colorOrImageOrConfig)
         Window:GetBackground()
+
         Window:SetBackgroundTransparency(transparency)
+        Window:GetBackgroundTransparency()
+
         Window:SetTitle(title)
         Window:GetTitle()
+
         Window:SetWindowImage(image)
+
         Window:SetSize(UDim2)
         Window:SetPosition(UDim2)
+
         Window:SetVisible(bool)
         Window:IsVisible()
 
-    SetBackground accepts a Color3, image asset ID/string, or a config table:
-        { Image = "rbxassetid://...", Rows = 4, Columns = 4,
-          FrameCount = 16, FrameRate = 12, ImageTransparency = 0 }
+        Window:SetStateKeybind(Enum.KeyCode)
+        Window:GetStateKeybind()
 
-    Sprite-sheet animation uses ImageRectSize / ImageRectOffset.
-    Roblox ImageLabels require image content IDs; raw external URLs may
-    not load unless the runtime supports them.
+        Window:SelectTab(tabName)
+        Window:Toggle()
+        Window:Destroy()
 
-    Dropdown extras:
+    SetBackground accepts:
 
-        options can be a table OR a function returning a table.
-        A function is re-evaluated on every open and on Refresh(),
-        so the list can stay live (e.g. players in the server).
+        Color3:
+            Sets a solid background color.
 
-        Dropdown:Refresh(newOptions, callCallback)
-        Dropdown:SetOptions(newOptions, callCallback)
-        Dropdown:GetOptions()          -- values, ids
-        Dropdown:SetRefreshOnOpen(bool)
-        Dropdown:GetSource()
-        Dropdown:IsOpen()
+        Image asset ID / image string:
+            Sets an image background.
 
-    Additional reference-style controls:
+        Configuration table:
+            {
+                Image = "rbxassetid://...",
+                Rows = 4,
+                Columns = 4,
+                FrameCount = 16,
+                FrameRate = 12,
+                ImageSize = Vector2.new(1024, 1024),
+                ImageTransparency = 0,
+                ScaleType = Enum.ScaleType.Crop
+            }
 
-        Tab:CreateHeader(
-            title,
-            subtitle,
-            order
-        )
+    Sprite-sheet animation uses ImageRectSize and ImageRectOffset.
 
-        Tab:CreateInfoCard(
-            title,
-            description,
-            accentColor,
-            order
-        )
+    External image URLs may require executor-specific functionality.
+    Standard Roblox ImageLabels require valid image content IDs.
 
-        Tab:CreateStatCard(
-            title,
-            value,
-            accentColor,
-            order
-        )
-
-    Images may be:
+    Image formats accepted by the library:
 
         "rbxassetid://123456789"
         123456789
@@ -142,7 +223,9 @@
 
     For normal executor usage:
 
-        local MoonLib = loadstring(game:HttpGet("YOUR_RAW_URL"))()
+        local MoonLib = loadstring(
+            game:HttpGet("YOUR_RAW_URL")
+        )()
 ]]
 
 local MoonLib = {}
