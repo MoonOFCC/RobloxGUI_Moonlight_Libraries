@@ -18,11 +18,7 @@
 
     Supported controls:
 
-        Tab:CreateLabel(
-            text,
-            order,
-            color
-        )
+        Tab:CreateLabel(text, order, color)
 
         Tab:CreateButton(
             text,
@@ -58,28 +54,6 @@
             customColor,
             multiSelect
         )
-
-        Tab:CreateTextbox(
-            text,
-            placeholder,
-            callback,
-            order,
-            customColor,
-            defaultValue
-        )
-
-        Textbox callback:
-            callback(value, enterPressed) is called when the input loses focus.
-
-        Textbox extras:
-
-            Textbox:GetValue()
-            Textbox:SetValue(value, callCallback)
-            Textbox:Clear(callCallback)
-            Textbox:SetPlaceholder(placeholder)
-            Textbox:Focus()
-            Textbox:Destroy()
-
 
     Dropdown extras:
 
@@ -1582,135 +1556,6 @@ function MoonLib:CreateWindow(title, windowImage)
             finish(SliderFrame)
 
             return SliderObject
-        end
-
-        function Tab:CreateTextbox(
-            text,
-            placeholder,
-            callback,
-            itemOrder,
-            customColor,
-            defaultValue
-        )
-            local baseColor = customColor or Theme.Card
-
-            local TextboxFrame = create("Frame", {
-                Name = tostring(text) .. "Textbox",
-                Parent = Page,
-                BackgroundColor3 = baseColor,
-                BorderSizePixel = 0,
-                Size = UDim2.new(1, -8, 0, 78),
-                LayoutOrder = itemOrder or 0,
-                ZIndex = 7,
-            })
-
-            addCorner(TextboxFrame, 3)
-            addStroke(
-                TextboxFrame,
-                customColor or Theme.BrightBorder,
-                1,
-                customColor and 0.18 or 0.35
-            )
-
-            local TextboxTitle = create("TextLabel", {
-                Name = "Title",
-                Parent = TextboxFrame,
-                BackgroundTransparency = 1,
-                Position = UDim2.new(0, 16, 0, 7),
-                Size = UDim2.new(1, -32, 0, 23),
-                Font = Enum.Font.GothamBold,
-                Text = tostring(text or "Input"),
-                TextColor3 = textColorFor(baseColor),
-                TextSize = 15,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                TextTruncate = Enum.TextTruncate.AtEnd,
-                ZIndex = 8,
-            })
-
-            local Input = create("TextBox", {
-                Name = "Input",
-                Parent = TextboxFrame,
-                BackgroundColor3 = Theme.PanelLight,
-                BorderSizePixel = 0,
-                Position = UDim2.new(0, 12, 0, 36),
-                Size = UDim2.new(1, -24, 0, 31),
-                Font = Enum.Font.Gotham,
-                Text = tostring(defaultValue or ""),
-                PlaceholderText = tostring(placeholder or "Enter text..."),
-                PlaceholderColor3 = Theme.MutedText,
-                TextColor3 = Theme.Text,
-                TextSize = 14,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                ClearTextOnFocus = false,
-                TextTruncate = Enum.TextTruncate.AtEnd,
-                MultiLine = false,
-                TextEditable = true,
-                ZIndex = 8,
-            })
-
-            addCorner(Input, 3)
-            addStroke(Input, Theme.Border, 1, 0.35)
-
-            local function fireCallback(enterPressed)
-                if callback then
-                    callback(Input.Text, enterPressed == true)
-                end
-            end
-
-            Input.Focused:Connect(function()
-                makeTween(Input, 0.12, {
-                    BackgroundColor3 = Theme.CardHover,
-                })
-            end)
-
-            Input.FocusLost:Connect(function(enterPressed)
-                makeTween(Input, 0.12, {
-                    BackgroundColor3 = Theme.PanelLight,
-                })
-
-                fireCallback(enterPressed)
-            end)
-
-            local TextboxObject = {
-                Frame = TextboxFrame,
-                Input = Input,
-            }
-
-            function TextboxObject:GetValue()
-                return Input.Text
-            end
-
-            function TextboxObject:SetValue(value, callCallback)
-                Input.Text = tostring(value or "")
-
-                if callCallback then
-                    fireCallback(false)
-                end
-
-                return Input.Text
-            end
-
-            function TextboxObject:Clear(callCallback)
-                return self:SetValue("", callCallback)
-            end
-
-            function TextboxObject:SetPlaceholder(newPlaceholder)
-                Input.PlaceholderText = tostring(newPlaceholder or "")
-            end
-
-            function TextboxObject:Focus()
-                if Input.Parent then
-                    Input:CaptureFocus()
-                end
-            end
-
-            function TextboxObject:Destroy()
-                TextboxFrame:Destroy()
-            end
-
-            finish(TextboxFrame)
-
-            return TextboxObject
         end
 
         function Tab:CreateDropdown(
