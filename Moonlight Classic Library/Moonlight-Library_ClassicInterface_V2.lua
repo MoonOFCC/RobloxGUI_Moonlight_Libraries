@@ -2662,9 +2662,6 @@ function MoonLib:CreateWindow(title, windowImage)
         InnerFrame.BackgroundTransparency = transparency
         BackgroundImage.ImageTransparency = transparency
         
-        if not BackgroundImage.Visible then
-            MainFrame.BackgroundTransparency = transparency
-        end
         return true
     end
 
