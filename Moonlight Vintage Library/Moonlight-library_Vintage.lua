@@ -141,6 +141,36 @@
         Window:GetTheme()                         -> snapshot table of the
                                                      current effective theme
 
+    THEME TOKENS
+
+        Window:ThemeExport()                       -> token string
+            Packs the window's theme into one short one-line ASCII
+            string (safe to paste into chats, config files, anywhere).
+
+        Window:ThemeImport(token, name?)
+            Applies a token produced by ThemeExport. Same partial-theme
+            rules as SetTheme: only the keys present in the token change,
+            unknown keys are skipped, and an invalid token returns false
+            (with a warning). Pass an optional `name` to also register
+            the imported theme, so it can be re-applied later.
+
+            Example — sharing a theme between two machines:
+
+                local token = Window:ThemeExport()   -- machine A
+                setclipboard(token)                  -- executor clipboard
+                                                     -- (or print(token))
+
+                Window:ThemeImport(tokenString)               -- machine B: apply now
+                Window:ThemeImport(tokenString, "Oceanic")    -- apply + register
+                Window:ThemeLoad("Oceanic")                   -- reload it anytime
+                -- or one-liner: Window:ThemeImport(getclipboard(), "Oceanic")
+
+            Tokens carry every serializable theme key (colors, numbers,
+            booleans, strings, the font pair, corner radius, tab stroke
+            settings and flat background configs such as Rows/Columns/
+            ImageSize/ScaleType). Anything that cannot be represented
+            is skipped with a warning.
+
     ANNOUNCEMENTS  (NEW)
         Five states. The announcement's UICorner stroke (and icon) change
         color per state:
@@ -271,6 +301,26 @@
             (scroll-aware, positional overshoot only). "None"
             disables the animation completely.
 
+        Tab:CreateDangerButton(text, callback, order?)
+            Two-step destructive button: first click ARMS it (turns
+            red, "click again to confirm"); second click within 3s
+            fires. Timeout or a successful fire unarms it.
+
+        Tab:CreateProgress(title, subtitle?, order?, customColor?)
+            Labeled async status row with an animated bar.
+            -> :SetValue(0-1) :SetSubtitle(s) :GetValue()
+               :SetIndeterminate(bool)  -- shimmer for unbounded tasks
+               :Done(finalText?)        -- full bar, success green
+               :Destroy()
+
+        Window:SetWindowScale(number 0.5-2)  Window:GetWindowScale()
+            Zooms the whole window (pivots at its center).
+
+        Window:GetAnnounceHistory()
+            Returns a copy of every announcement fired this session:
+            { timestamp, announcingUser, announcementMessage,
+              announcementType, announcementDuration }
+
     TAB ELEMENTS (all take a trailing LayoutOrder)
 
         Tab:CreateLabel(text, order, color)
@@ -309,7 +359,7 @@
 ]]
 
 local MoonLib = {}
-MoonLib.Version = "2.28.0"
+MoonLib.Version = "2.31.0"
 
 -- In-game index, see MoonLib:Help()
 local Description = {
@@ -321,6 +371,8 @@ local Description = {
         "Window:SetTheme({ Sidebar = ..., TabsStrokeColor = ... }) -- partial",
         "Window:ThemeLoad('Ocean')  /  Window:ThemeSave('MyTheme')",
         "MoonLib:GetRegisteredThemes()  MoonLib:GetTheme(name)",
+        "Window:ThemeExport()  -> one-line token of the current theme",
+        "Window:ThemeImport(token, 'name?')  -- apply it; 'name' also registers it",
         "Built-ins: Vantage, Ocean, Crimson, Emerald, Gold",
         "Window:Announce(title, message, 'Info'|'Success'|'Warn'|'Error', seconds)",
         "Window:AnnounceInfo/Success/Warn/Error(message, title?, duration?)",
@@ -329,6 +381,10 @@ local Description = {
         "Info = accent | Success = green | Warn = yellow | Error = red | Custom = your Color3",
         "Error toasts are sticky unless you pass a duration",
         "Window:SetTabTransition('Fade'|'Drop-In'|'Pop'|'None') -- tab transition",
+        "Tab:CreateDangerButton(text, callback, order?) -- arm-then-confirm destructive button",
+        "Tab:CreateProgress(title, subtitle?, order?, color?) -- async status bar: :SetValue(0-1) :SetIndeterminate(bool) :Done(text?)",
+        "Window:SetWindowScale(0.5-2) / Window:GetWindowScale() -- whole-window zoom",
+        "Window:GetAnnounceHistory() -- copy of every announcement: {timestamp, announcingUser, announcementMessage, announcementType, announcementDuration}",
         "Only keys in a theme table are applied; the rest stay unchanged.",
     },
     Themes = table.concat({
@@ -358,6 +414,11 @@ local Description = {
         "RegisterTheme with an existing name replaces the old registration",
         "MoonLib:UnregisterTheme(name) MoonLib:GetTheme(name) MoonLib:GetRegisteredThemes()",
         "Window:GetTheme() -- snapshot of the current effective theme",
+        "Window:ThemeExport() -- snapshot as a one-line token string",
+        "Window:ThemeImport(token, name?) -- apply an exported token;",
+        "   passing 'name' also registers it (ThemeLoad(name) later)",
+        "local t = Window:ThemeExport(); Window:ThemeImport(t, 'Mine')",
+        "Window:ThemeLoad('Mine')  -- reload it by name any time",
     }, "\n"),
     Announce = table.concat({
         "States: Info | Success | Warn | Error | Custom",
@@ -394,6 +455,8 @@ local Description = {
         "Window:SetPresenceColor(c) GetPresenceColor SetPresenceStyle('Dot'|'Ring'|'Hidden')",
         "Window:GetPresenceStyle Window:SetPresenceImage(assetOrNil)",
         "Window:SetDefaultSubtitle(text)",
+        "Window:GetAnnounceHistory()   -- all announcements, copied",
+        "Window:SetWindowScale(0.5-2) GetWindowScale()   -- window zoom",
         "Window:SetTabTransition('Fade'|'Drop-In'|'Pop'|'None') GetTabTransition()",
         "   Fade = fade in top-to-bottom (default) | Drop-In = slide",
         "   in from off-screen left into slots (positional)",
@@ -410,6 +473,9 @@ local Description = {
         "Tab:CreateInfoCard(title, description, accentColor?, order)",
         "Tab:CreateStatCard(title, value, accentColor?, order)",
         "Tab:CreateButton(text, callback, customColor?, order)",
+        "Tab:CreateDangerButton(text, callback, order?) -- two-click confirm (red)",
+        "Tab:CreateProgress(title, subtitle?, order?, color?) -- async bar:",
+        "   -> :SetValue(0-1) :SetIndeterminate(bool) :Done(text?) :Destroy()",
         "Tab:CreateToggle(text, default, callback, order?, customColor?)",
         "   -> :GetValue() :SetValue(v, callCallback) :Toggle() :Destroy()",
         "Tab:CreateSlider(text, defaultState, callback, defaultValue, min, max,",
@@ -1151,6 +1217,249 @@ local function defaultStateTitle(state)
 end
 
 -- =====================================================
+--  Theme tokens (one-line shareable theme strings)
+-- =====================================================
+
+-- Format: MOON-THEME:v1:<key=value;key=value;...>
+--   Values are tagged:  c: color (R,G,B bytes) | n: number | b: boolean
+--   s: string | f: font pair (Regular,Bold) | e: enum item | h: flat table
+--   Flat tables (background configs) are their own key=value pairs, then
+--   percent-escaped as one nested blob. Keys and string values are
+--   percent-escaped too. Imports validate through Window:SetTheme, so a
+--   hand-edited token behaves exactly like a hand-written theme table.
+
+local function escToken(s)
+    return tostring(s):gsub("[^%w._-]", function(c)
+        return ("%%%02X"):format(c:byte())
+    end)
+end
+
+local function unescToken(s)
+    return (tostring(s):gsub("%%(%x%x)", function(h)
+        return string.char(tonumber(h, 16))
+    end))
+end
+
+local function clampByte(n)
+    n = tonumber(n) or 0
+    if n < 0 then n = 0 elseif n > 255 then n = 255 end
+    return math.floor(n + 0.5)
+end
+
+local function clampUnit(n)
+    n = tonumber(n) or 0
+    if n < 0 then n = 0 elseif n > 1 then n = 1 end
+    return n
+end
+
+local function encodeTokenScalar(value)
+    if typeof(value) == "Color3" then
+        return ("c:%d,%d,%d"):format(clampByte(value.R * 255), clampByte(value.G * 255), clampByte(value.B * 255))
+    elseif type(value) == "number" then
+        if value ~= value or value == math.huge or value == -math.huge then
+            return nil -- NaN/inf can't roundtrip
+        end
+
+        return "n:" .. tostring(value)
+    elseif type(value) == "boolean" then
+        return "b:" .. tostring(value)
+    elseif type(value) == "string" then
+        return "s:" .. escToken(value)
+    elseif typeof(value) == "Vector2" then
+        return ("v:%s,%s"):format(tostring(value.X), tostring(value.Y))
+    elseif typeof(value) == "EnumItem" then
+        return "e:" .. tostring(value.Name)
+    end
+
+    return nil
+end
+
+local function encodeTokenTable(value)
+    -- Flat tables only (e.g. a background sprite config). Nested tables
+    -- make the whole key unserializable.
+    local parts = {}
+
+    for key, item in pairs(value) do
+        local scalar = encodeTokenScalar(item)
+
+        if scalar == nil then
+            return nil
+        end
+
+        parts[#parts + 1] = escToken(tostring(key)) .. "=" .. scalar
+    end
+
+    table.sort(parts)
+
+    return "h:" .. escToken(table.concat(parts, ";"))
+end
+
+local function encodeTokenValue(key, value)
+    if typeof(value) == "Color3" or type(value) == "number"
+        or type(value) == "boolean" or type(value) == "string" then
+        return encodeTokenScalar(value)
+    elseif type(value) == "table" then
+        -- Font pair { Regular = Enum.Font, Bold = Enum.Font }
+        if typeof(value.Regular) == "EnumItem" and typeof(value.Bold) == "EnumItem"
+            and value.Regular.EnumType == Enum.Font and value.Bold.EnumType == Enum.Font then
+            return "f:" .. tostring(value.Regular.Name) .. "," .. tostring(value.Bold.Name)
+        end
+
+        return encodeTokenTable(value)
+    end
+
+    return nil
+end
+
+local function encodeThemeToken(theme)
+    local parts = {}
+    local skipped = {}
+
+    for key, value in pairs(theme) do
+        local encoded = encodeTokenValue(key, value)
+
+        if encoded == nil then
+            skipped[#skipped + 1] = tostring(key)
+        else
+            parts[#parts + 1] = escToken(tostring(key)) .. "=" .. encoded
+        end
+    end
+
+    table.sort(parts)
+
+    if #skipped > 0 then
+        table.sort(skipped)
+        warn("[MoonLib] ThemeExport skipped (not serializable): " .. table.concat(skipped, ", "))
+    end
+
+    return "MOON-THEME:v1:" .. table.concat(parts, ";")
+end
+
+local function decodeFontName(name)
+    local ok, item = pcall(function()
+        return Enum.Font[name]
+    end)
+
+    if ok and typeof(item) == "EnumItem" and item.EnumType == Enum.Font then
+        return item
+    end
+
+    return nil
+end
+
+local function decodeEnumNameLoose(name)
+    -- Enum items in config tables don't record their enum type, so try
+    -- the enums themes actually use (ScaleType, Font) before giving up.
+    for _, enumType in ipairs({ Enum.ScaleType, Enum.Font }) do
+        local ok, item = pcall(function()
+            return enumType[name]
+        end)
+
+        if ok and typeof(item) == "EnumItem" then
+            return item
+        end
+    end
+
+    return nil
+end
+
+local function decodeTokenScalar(tag, val)
+    if tag == "c" then
+        local r, g, b = val:match("^(%d+),(%d+),(%d+)$")
+
+        if r then
+            return Color3.fromRGB(clampByte(r), clampByte(g), clampByte(b))
+        end
+    elseif tag == "n" then
+        return tonumber(val)
+    elseif tag == "b" then
+        return val == "true"
+    elseif tag == "s" then
+        return unescToken(val)
+    elseif tag == "v" then
+        local x, y = val:match("^(-?[%d.]+),(-?[%d.]+)$")
+
+        if x and Vector2 then
+            return Vector2.new(tonumber(x) or 0, tonumber(y) or 0)
+        end
+    elseif tag == "e" then
+        return decodeEnumNameLoose(val)
+    end
+
+    return nil
+end
+
+local function decodeTokenTable(val)
+    local body = unescToken(val)
+    local out = {}
+
+    for pair in body:gmatch("[^;]+") do
+        local key, rawValue = pair:match("^([^=]*)=(.*)$")
+
+        if key then
+            local tag, item = tostring(rawValue or ""):match("^(%a):(.*)$")
+            local scalar = tag and decodeTokenScalar(tag, item) or nil
+            local unescKey = unescToken(key)
+
+            if scalar ~= nil and unescKey ~= "" then
+                out[unescKey] = scalar
+            end
+        end
+    end
+
+    return out
+end
+
+local function decodeThemeToken(token)
+    local body = tostring(token or ""):match("^MOON%-THEME:v1:(.*)$")
+
+    if body == nil then
+        return nil, "not a MOON-THEME:v1 token"
+    end
+
+    local theme = {}
+
+    for pair in body:gmatch("[^;]+") do
+        local key, rawValue = pair:match("^([^=]*)=(.*)$")
+
+        if key then
+            local unescKey = unescToken(key)
+            local tag, val = tostring(rawValue or ""):match("^(%a):(.*)$")
+
+            if unescKey ~= "" and tag then
+                if tag == "f" then
+                    local regularName, boldName = val:match("^([^,]+),([^,]+)$")
+                    local regularItem = regularName and decodeFontName(regularName) or nil
+                    local boldItem = regularItem and decodeFontName(boldName) or nil
+
+                    if regularItem and boldItem then
+                        theme[unescKey] = { Regular = regularItem, Bold = boldItem }
+                    end
+                elseif tag == "h" then
+                    local decodedTable = decodeTokenTable(val)
+
+                    if next(decodedTable) ~= nil then
+                        theme[unescKey] = decodedTable
+                    end
+                else
+                    local scalar = decodeTokenScalar(tag, val)
+
+                    if scalar ~= nil then
+                        theme[unescKey] = scalar
+                    end
+                end
+            end
+        end
+    end
+
+    if next(theme) == nil then
+        return nil, "token contained no usable keys"
+    end
+
+    return theme
+end
+
+-- =====================================================
 --  Theme registry (shared between all windows)
 -- =====================================================
 
@@ -1311,7 +1620,8 @@ function MoonLib:CreateWindow(title, windowImage, theme)
         Parent = ScreenGui,
         BackgroundColor3 = Theme.MainBackground,
         BorderSizePixel = 0,
-        Position = UDim2.new(0.5, -WINDOW_WIDTH / 2, 0.5, -WINDOW_HEIGHT / 2),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
         Size = UDim2.new(0, WINDOW_WIDTH, 0, WINDOW_HEIGHT),
         ClipsDescendants = true,
         ZIndex = 1,
@@ -1319,6 +1629,15 @@ function MoonLib:CreateWindow(title, windowImage, theme)
 
     addCorner(MainFrame, 14)
     addStroke(MainFrame, Theme.BrightBorder, 1, 0.45)
+
+    -- Whole-window zoom: one UIScale on the root frame.
+    -- SetWindowScale() rewrites its Scale with a soft tween.
+    local WindowScale = create("UIScale", {
+        Name = "WindowScale",
+        Parent = MainFrame,
+        Scale = 1,
+    })
+    local windowScaleValue = 1
 
     local InnerFrame = create("Frame", {
         Name = "InnerFrame",
@@ -3292,6 +3611,11 @@ function MoonLib:CreateWindow(title, windowImage, theme)
         end
     end
 
+    -- Every announcement this session is recorded here (for
+    -- Window:GetAnnounceHistory()). Entries are writer-owned; readers
+    -- get copies.
+    local announceHistory = {}
+
     local announceRefreshers = {}
 
     -- BaseColor override: when the window's announce-base-color setting is
@@ -3330,6 +3654,14 @@ function MoonLib:CreateWindow(title, windowImage, theme)
             -- Error never hides on its own; every other state defaults to 6s.
             duration = (normalizedState == "Error") and 0 or 6
         end
+
+        announceHistory[#announceHistory + 1] = {
+            timestamp = os.time(),
+            announcingUser = UserNameLabel and UserNameLabel.Text or "Player",
+            announcementMessage = tostring(message or ""),
+            announcementType = normalizedState,
+            announcementDuration = duration,
+        }
 
         -- Per-call icon wins; otherwise the Custom state falls back to the
         -- window's custom icon setting (star when none is set).
@@ -3948,6 +4280,7 @@ function MoonLib:CreateWindow(title, windowImage, theme)
                 })
             end)
 
+
             Button.MouseButton1Click:Connect(function()
                 if callback then
                     callback()
@@ -3955,6 +4288,315 @@ function MoonLib:CreateWindow(title, windowImage, theme)
             end)
 
             return finish(Button)
+        end
+
+        function Tab:CreateDangerButton(text, callback, itemOrder)
+            -- Two-step confirmation for destructive actions: the first
+            -- click ARMS the button (red, "click again to confirm");
+            -- the second click within 3 seconds fires for real. A
+            -- timeout or a successful fire disarms it.
+            local originalText = tostring(text)
+            local armed = false
+            local hovered = false
+            local armToken = 0
+            local armedAt = 0
+
+            local Button = create("TextButton", {
+                Name = originalText .. "DangerButton",
+                Parent = Page,
+                BackgroundColor3 = Theme.Card,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, -8, 0, 44),
+                Font = Enum.Font.GothamBold,
+                Text = originalText,
+                TextColor3 = textColorFor(Theme.Card),
+                TextSize = 15,
+                TextXAlignment = Enum.TextXAlignment.Center,
+                AutoButtonColor = false,
+                LayoutOrder = itemOrder or 0,
+                ZIndex = 7,
+            })
+
+            addCorner(Button, 9)
+            addStroke(Button, Theme.Red, 1, 0.5)
+
+            local dangerStroke = Button:FindFirstChildOfClass("UIStroke")
+
+            local function visual()
+                if armed then
+                    Button.BackgroundColor3 = Theme.Red
+                    Button.TextColor3 = textColorFor(Theme.Red)
+                    Button.Text = "Click again to confirm"
+
+                    if dangerStroke then
+                        dangerStroke.Transparency = 0.05
+                    end
+                else
+                    Button.BackgroundColor3 = hovered and hoverColorFor(Theme.Card) or Theme.Card
+                    Button.TextColor3 = textColorFor(Theme.Card)
+                    Button.Text = originalText
+
+                    if dangerStroke then
+                        dangerStroke.Transparency = hovered and 0.2 or 0.5
+                    end
+                end
+            end
+
+            local function setArmed(state)
+                armed = state
+                armToken = armToken + 1
+                visual()
+
+                if armed then
+                    armedAt = os.clock()
+                    local token = armToken
+
+                    task.delay(3, function()
+                        -- Clock check as well as the token so an early
+                        -- timer fire can never disarm a fresh arm.
+                        if armed and token == armToken and os.clock() - armedAt >= 2.5 then
+                            setArmed(false)
+                        end
+                    end)
+                end
+            end
+
+            Button.MouseEnter:Connect(function()
+                hovered = true
+                visual()
+            end)
+            Button.MouseLeave:Connect(function()
+                hovered = false
+                visual()
+            end)
+            Button.MouseButton1Click:Connect(function()
+                if armed then
+                    setArmed(false)
+
+                    if callback then
+                        callback()
+                    end
+                else
+                    setArmed(true)
+                end
+            end)
+
+            return finish(Button)
+        end
+
+        function Tab:CreateProgress(title, subtitle, itemOrder, customColor)
+            -- Labeled async status row with an animated bar. Drive it
+            -- from your own code:
+            --   :SetValue(0-1)        determinate (tweened fill)
+            --   :SetIndeterminate(t)  unbounded tasks (shimmer sweep)
+            --   :SetSubtitle(s)       update the helper text
+            --   :GetValue()           current 0-1 value
+            --   :Done(finalText?)     full bar, success green
+            --   :Destroy()
+            local accent = customColor or Theme.Blue
+            local destroyed = false
+            local indeterminate = false
+            local pulseElapsed = 0
+            local heartbeatConn = nil
+            local value = 0
+
+            local Progress = create("Frame", {
+                Name = tostring(title) .. "Progress",
+                Parent = Page,
+                BackgroundColor3 = Theme.Card,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, -8, 0, 64),
+                LayoutOrder = itemOrder or 0,
+                ZIndex = 7,
+            })
+
+            addCorner(Progress, 9)
+            addStroke(Progress, customColor or Theme.ElementStroke, 1, customColor and 0.18 or 0.35)
+
+            create("TextLabel", {
+                Name = "Title",
+                Parent = Progress,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 14, 0, 8),
+                Size = UDim2.new(1, -28, 0, 20),
+                Font = Enum.Font.GothamBold,
+                Text = tostring(title),
+                TextColor3 = textColorFor(Theme.Card),
+                TextSize = 14,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                ZIndex = 8,
+            })
+
+            local SubLabel = create("TextLabel", {
+                Name = "Subtitle",
+                Parent = Progress,
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0, 14, 0, 29),
+                Size = UDim2.new(1, -28, 0, 15),
+                Font = Enum.Font.Gotham,
+                Text = tostring(subtitle or ""),
+                TextColor3 = Theme.SecondaryText,
+                TextSize = 12,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+                ZIndex = 8,
+            })
+
+            local Rail = create("Frame", {
+                Name = "BarRail",
+                Parent = Progress,
+                BackgroundColor3 = Theme.PanelLight,
+                BorderSizePixel = 0,
+                Position = UDim2.new(0, 14, 1, -12),
+                Size = UDim2.new(1, -28, 0, 5),
+                ClipsDescendants = true,
+                ZIndex = 8,
+            })
+
+            addCorner(Rail, 2)
+
+            local Fill = create("Frame", {
+                Name = "BarFill",
+                Parent = Rail,
+                BackgroundColor3 = accent,
+                BorderSizePixel = 0,
+                Position = UDim2.new(0, 0, 0, 0),
+                Size = UDim2.new(0, 0, 1, 0),
+                ZIndex = 9,
+            })
+
+            addCorner(Fill, 2)
+
+            local RunService = nil
+
+            pcall(function()
+                if game and game.GetService then
+                    RunService = game:GetService("RunService")
+                end
+            end)
+
+            local function stopPulse()
+                local conn = heartbeatConn
+                heartbeatConn = nil
+
+                if conn then
+                    pcall(function()
+                        conn:Disconnect()
+                    end)
+                end
+            end
+
+            local function resetFill()
+                stopPulse()
+
+                pcall(function()
+                    Fill.Position = UDim2.new(0, 0, 0, 0)
+                end)
+            end
+
+            local ProgressObj = { Frame = Progress }
+
+            function ProgressObj:SetValue(v)
+                value = math.min(math.max(tonumber(v) or 0, 0), 1)
+                indeterminate = false
+                resetFill()
+
+                pcall(function()
+                    makeTween(Fill, 0.18, { Size = UDim2.new(value, 0, 1, 0) }, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+                end)
+
+                return value
+            end
+
+            function ProgressObj:SetSubtitle(text)
+                pcall(function()
+                    SubLabel.Text = tostring(text or "")
+                end)
+
+                return true
+            end
+
+            function ProgressObj:GetValue()
+                return value
+            end
+
+            function ProgressObj:SetIndeterminate(state)
+                indeterminate = state == true
+
+                if indeterminate then
+                    resetFill()
+                    pulseElapsed = 0
+
+                    pcall(function()
+                        Fill.Size = UDim2.new(0.3, 0, 1, 0)
+                    end)
+
+                    if RunService and RunService.Heartbeat then
+                        pcall(function()
+                            heartbeatConn = RunService.Heartbeat:Connect(function(dt)
+                                if destroyed or not indeterminate then
+                                    stopPulse()
+                                    return
+                                end
+
+                                pulseElapsed = pulseElapsed + (tonumber(dt) or 0.016)
+                                -- 1.4s triangle sweep of a 0.3-wide shimmer
+                                -- across the rail.
+                                local span = (math.sin(pulseElapsed * (2 * math.pi / 1.4) - math.pi / 2) + 1) / 2
+                                local x = -0.3 + span * 1.3
+
+                                pcall(function()
+                                    Fill.Position = UDim2.new(x, 0, 0, 0)
+                                end)
+                            end)
+                        end)
+                    end
+                else
+                    resetFill()
+
+                    pcall(function()
+                        makeTween(Fill, 0.18, { Size = UDim2.new(value, 0, 1, 0) }, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+                    end)
+                end
+
+                return indeterminate
+            end
+
+            function ProgressObj:Done(finalText)
+                value = 1
+                indeterminate = false
+                resetFill()
+
+                pcall(function()
+                    makeTween(Fill, 0.25, {
+                        Size = UDim2.new(1, 0, 1, 0),
+                        BackgroundColor3 = stateColor("Success"),
+                    }, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+                end)
+
+                if finalText ~= nil then
+                    self:SetSubtitle(finalText)
+                end
+
+                return true
+            end
+
+            function ProgressObj:Destroy()
+                destroyed = true
+                indeterminate = false
+                stopPulse()
+
+                pcall(function()
+                    Progress:Destroy()
+                end)
+
+                return true
+            end
+
+            finish(Progress)
+
+            return ProgressObj
         end
 
         function Tab:CreateToggle(text, default, callback, itemOrder, customColor)
@@ -5339,6 +5981,38 @@ function MoonLib:CreateWindow(title, windowImage, theme)
         return UserCard.Visible
     end
 
+    -- Whole-window zoom (0.5 - 2.0, pivots around the window's center).
+    function Window:SetWindowScale(value)
+        local scale = tonumber(value)
+
+        if not scale then
+            warn("[MoonLib] SetWindowScale expects a number between 0.5 and 2")
+            return false
+        end
+
+        scale = math.min(math.max(scale, 0.5), 2)
+        windowScaleValue = scale
+
+        local tweened = false
+
+        pcall(function()
+            makeTween(WindowScale, 0.2, { Scale = scale }, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+            tweened = true
+        end)
+
+        if not tweened then
+            pcall(function()
+                WindowScale.Scale = scale
+            end)
+        end
+
+        return true, scale
+    end
+
+    function Window:GetWindowScale()
+        return windowScaleValue
+    end
+
     -- Granular user card controls.
     function Window:SetProfileName(name)
         name = tostring(name or "")
@@ -5617,6 +6291,32 @@ function MoonLib:CreateWindow(title, windowImage, theme)
     -- accent when omitted).
     function Window:AnnounceCustom(message, title, color, duration)
         return showToast(title, message, "Custom", duration, color)
+    end
+
+    -- Every announcement fired this session, oldest first. Returns a
+    -- FRESH table of fresh copies (callers can't mutate history).
+    -- Entry shape:
+    --   timestamp             unix seconds (os.time())
+    --   announcingUser        the profile name (Window:SetUser/SetProfileName)
+    --   announcementMessage   the message text
+    --   announcementType      "Info" | "Success" | "Warn" | "Error" | "Custom"
+    --   announcementDuration  seconds on screen (0 = sticky, e.g. Error)
+    function Window:GetAnnounceHistory()
+        local out = {}
+
+        for index = 1, #announceHistory do
+            local entry = announceHistory[index]
+
+            out[index] = {
+                timestamp = entry.timestamp,
+                announcingUser = entry.announcingUser,
+                announcementMessage = entry.announcementMessage,
+                announcementType = entry.announcementType,
+                announcementDuration = entry.announcementDuration,
+            }
+        end
+
+        return out
     end
 
     -- Notification color mode. Default false: every type keeps its defined
@@ -6450,6 +7150,41 @@ function MoonLib:CreateWindow(title, windowImage, theme)
         end
 
         return self:SetTheme(deepCopy(theme))
+    end
+
+    -- Snapshot of the current theme as a one-line shareable token.
+    function Window:ThemeExport()
+        return encodeThemeToken(self:GetTheme())
+    end
+
+    -- Apply a token produced by ThemeExport. All validation flows through
+    -- Window:SetTheme, so partial/unknown keys behave exactly like a
+    -- hand-written theme table. Pass `name` to also register the imported
+    -- theme (Window:ThemeLoad(name) afterwards).
+    function Window:ThemeImport(token, name)
+        local theme, err = decodeThemeToken(token)
+
+        if theme == nil then
+            warn("[MoonLib] ThemeImport: " .. tostring(err))
+            return false
+        end
+
+        local ok = self:SetTheme(theme)
+
+        if not ok then
+            return false
+        end
+
+        if name ~= nil then
+            local registered, regErr = registerThemeInternal(tostring(name), theme)
+
+            if not registered then
+                warn("[MoonLib] ThemeImport: " .. tostring(regErr))
+                return false
+            end
+        end
+
+        return true
     end
 
     -- Construct the window with an optional theme (only provided keys apply).
